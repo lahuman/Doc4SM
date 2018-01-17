@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.company.CompanyDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	ID,
+    	COMPANY_NAME,
+    	WORKER,
+    	TEL,
+    	EMAIL,
+    	REGISTER_DT,
+    	MODIFY_DT
+	FROM company
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT 
+     	count(*)
+	FROM company
+  </select>
+  
+  
+  <select id="companyList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT
+     	ID,
+    	COMPANY_NAME,
+    	WORKER,
+    	TEL,
+    	EMAIL,
+    	REGISTER_DT,
+    	MODIFY_DT
+	FROM company
+  </select>
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO company
+			(
+			`ID`,
+			`COMPANY_NAME`,
+			`WORKER`,
+			`TEL`,
+			`EMAIL`,
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			VALUES
+			(
+			#{param.id},
+			#{param.company_name},
+			#{param.worker},
+			#{param.tel},
+			#{param.email},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId} )	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE company
+				SET
+				`COMPANY_NAME` = #{param.company_name},
+				`WORKER` = #{param.worker},
+				`TEL` = #{param.tel},
+				`EMAIL` = #{param.email},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId} 
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM company
+	WHERE `ID` = #{param.id}
+  </delete>
+  
+  <select id="contractList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	COMPANY_ID
+    	, START_DT
+    	, END_DT
+    	, CONTRACT_INFO
+    	, REGISTER_DT 
+    from contract
+    where COMPANY_ID  = #{param.company_id}
+    order by END_DT DESC
+  </select>
+  <insert id="insertContract" parameterType="java.util.List">
+  	INSERT INTO contract(
+  		COMPANY_ID
+  		, START_DT
+  		, END_DT
+  		, CONTRACT_INFO
+  		, REGISTER_DT
+  	) values
+  	<foreach collection="list" item="param" index="index" separator=",">
+	  	( #{param.company_id}, #{param.start_dt}, #{param.end_dt}, #{param.contract_info}, <include refid="Core.nowDt"/> )
+  	</foreach>
+  </insert>
+  <delete id="deleteContract" parameterType="kr.pe.lahuman.utils.DataMap">
+  	DELETE FROM contract
+  	where company_id=#{param.company_id}
+  </delete>
+</mapper>

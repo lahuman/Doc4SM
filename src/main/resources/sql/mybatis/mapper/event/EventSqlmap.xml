@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.event.EventDao">
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	e.REQ_CODE,
+		case ifnull(p.proc_type , '0')
+			when '0' then '요청'
+			when 'EV00' then '접수-처리'
+			when 'EV01' then '서비스'
+			when 'EV02' then '변경'
+			when 'EV03' then '장애'
+		END as PROCES_TYPE,
+		(
+		select 
+			CONCAT(S.NAME, '-', C.NAME) AS SERVICE_CATEGORY_NM
+		from service S, category C
+		where S.ID = C.SERVICE_ID and e.CATEGORY_ID = c.ID) as CATEGORY_NM,
+		(SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='EMGC' AND  C.CODE = e.EMERGENCY_CODE) AS EMERGENCY_TYPE,
+		e.REQ_TITLE,	   	
+    	e.REQ_DT,
+    	e.USER,
+    	e.USER_TEL,
+		(SELECT U.NAME FROM user U WHERE U.USER_ID =  p.proc_user) PROC_USER,
+		p.SCHEDULE_DT,
+		p.COMPLETE_DT,
+		e.FILE_NAME,
+		e.REQ_FILE,
+		e.SETTLE,
+		e.FTP,
+		e.HELPDESK,
+    	e.REGISTER_DT
+    	, (select m.TITLE from milestone m where m.id =  mr.MILESTONE_ID) AS MILESTONE
+	FROM event e  left outer join process p on e.REQ_CODE = p.REQ_CODE 
+		left join milestone_relation mr on mr.event_type = 'E' and event_code = e.req_code
+	<where>
+		 e.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_type)">
+			<choose>
+				<when test='param.proc_type.equals("0")'>
+					AND ( p.proc_type is null OR p.proc_type = 'EV00')
+				</when>
+				<when test='param.proc_type.equals("1")'>
+					AND ( p.proc_type = 'EV01' OR p.proc_type = 'EV02' OR p.proc_type = 'EV03')
+				</when>
+				<otherwise>
+					AND p.proc_type = #{param.proc_type} 
+				</otherwise> 
+			</choose>
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_title)">
+			AND e.REQ_TITLE like concat('%', #{param.req_title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND p.PROC_USER = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_dt)">
+			AND left(e.req_dt, 6) = #{param.req_dt}
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+		ORDER BY e.REQ_DT DESC
+	</if>
+	
+	<include refid="Core.limit"/>
+  </select>
+  
+  
+   <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT 
+     	count(*)
+	FROM event e  left outer join process p on e.REQ_CODE = p.REQ_CODE 
+		left join milestone_relation mr on mr.event_type = 'E' and event_code = e.req_code
+	<where>
+		 e.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_type)">
+			<choose>
+				<when test='param.proc_type.equals("0")'>
+					AND ( p.proc_type is null OR p.proc_type = 'EV00')
+				</when>
+				<when test='param.proc_type.equals("1")'>
+					AND ( p.proc_type = 'EV01' OR p.proc_type = 'EV02' OR p.proc_type = 'EV03')
+				</when>
+				<otherwise>
+					AND p.proc_type = #{param.proc_type} 
+				</otherwise> 
+			</choose>
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_title)">
+			AND e.REQ_TITLE like concat('%', #{param.req_title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND p.PROC_USER = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_dt)">
+			AND left(e.req_dt, 6) = #{param.req_dt}
+		</if>
+	</where>
+	
+	
+  </select>
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.req_code)">
+	  		INSERT INTO event
+			(
+			`REQ_CODE`,
+			`CATEGORY_ID`,
+			`REQ_DT`,
+			`USER`,
+			`USER_TEL`,
+			`REQ_TITLE`,
+			`EMERGENCY_CODE`,
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.file_name)">
+			`FILE_NAME`,
+			</if>
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_file)">
+			`REQ_FILE`,
+			</if>
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			select 		
+			concat(DATE_FORMAT(str_to_date(#{param.req_dt}   ,'%Y%m%d%H%i%s'), '%Y%m'),'-', CAST(lpad(count(1)+1, 3, '0') AS CHAR(3))),
+			#{param.category_id},
+			#{param.req_dt},
+			#{param.user},
+			#{param.user_tel},
+			#{param.req_title},	
+			#{param.emergency_code},	
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.file_name)">
+			#{param.file_name},
+			</if>
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_file)">
+			#{param.req_file},
+			</if>
+			<include refid="Core.nowDt"/>
+			, #{param.getLogin4UserId} 			
+			from event 
+			where req_code like concat(DATE_FORMAT(str_to_date(#{param.req_dt}   ,'%Y%m%d%H%i%s'), '%Y%m'), '%')
+	  	</when>
+	  	<otherwise>
+	  		UPDATE event
+				SET
+				`CATEGORY_ID` = #{param.category_id},
+				`REQ_DT` = #{param.req_dt},
+				`USER` = #{param.user},
+				`USER_TEL` = #{param.user_tel},
+				`REQ_TITLE` = #{param.req_title},
+				<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.file_name)">
+				`FILE_NAME` = #{param.file_name},
+				</if>
+				<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_file)">
+				`REQ_FILE` = #{param.req_file},
+				</if>				
+				`EMERGENCY_CODE` = #{param.emergency_code}
+				WHERE `REQ_CODE` = #{param.req_code}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <insert id="margeProcess" parameterType="kr.pe.lahuman.utils.DataMap">
+	  	INSERT INTO `process`
+			(`REQ_CODE`,
+			`PROC_TYPE`,
+			`REQ_TYPE`,
+			`RECEIPT_DT`,
+			`PROC_USER`,
+			`SCHEDULE_DT`,
+			`COMPLETE_DT`,
+			`SPEND_TIME`,
+			`PROCESS_RT`,
+			`INFRA_ID`,
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			VALUES
+			(#{param.req_code},
+			#{param.proc_type},
+			#{param.req_type},
+			#{param.receipt_dt},
+			#{param.proc_user},
+			#{param.schedule_dt},
+			#{param.complete_dt},
+			#{param.spend_time},
+			#{param.process_rt},
+			#{param.infra_id},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId} 
+			)ON DUPLICATE KEY UPDATE
+		`PROC_TYPE` = #{param.proc_type},
+		`REQ_TYPE` = #{param.req_type},
+		`RECEIPT_DT` = #{param.receipt_dt},
+		`PROC_USER` = #{param.proc_user},
+		`SCHEDULE_DT` = #{param.schedule_dt},
+		`COMPLETE_DT` = #{param.complete_dt},
+		`SPEND_TIME` = #{param.spend_time},
+		`PROCESS_RT` = #{param.process_rt},
+		`INFRA_ID` = #{param.infra_id},
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId} 
+  </insert>
+  
+   <update id="changeAttachFile" parameterType="kr.pe.lahuman.utils.DataMap">
+	   UPDATE `event` SET
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.file_name)">
+		`FILE_NAME` = #{param.file_name},
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_file)">
+		`REQ_FILE` = #{param.req_file},
+		</if>	
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+	   WHERE REQ_CODE  = #{param.req_code}
+  </update>
+  
+  <insert id="margeChange" parameterType="kr.pe.lahuman.utils.DataMap">
+		INSERT INTO `change`
+		(`REQ_CODE`,
+		`WORK_ST`,
+		`WORK_ET`,
+		`SERVICE_STOP_TIME`,
+		`CHANGE_LOG`,
+		`WORK_PLAN`,
+		`RESTORE_PLAN`,
+		`REASON`,
+		`EFFECT`,
+		`RESULT`,
+		`CAB`,
+		`SUCCESS`,
+		`REGISTER_DT`,
+		`REGISTER_ID`
+		)
+		VALUES
+		(#{param.req_code},
+		#{param.work_st},
+		#{param.work_et},
+		#{param.service_stop_time},
+		#{param.change_log},
+		#{param.work_plan},
+		#{param.restore_plan},
+		#{param.reason},
+		#{param.effect},
+		#{param.result},
+		#{param.cab},
+		#{param.success},
+		<include refid="Core.nowDt"/>,
+		#{param.getLogin4UserId} 
+		)ON DUPLICATE KEY UPDATE
+		`WORK_ST` = #{param.work_st},
+		`WORK_ET` = #{param.work_et},
+		`SERVICE_STOP_TIME` = #{param.service_stop_time},
+		`CHANGE_LOG`= #{param.change_log},
+		`WORK_PLAN`= #{param.work_plan},
+		`REASON` = #{param.reason},
+		`RESTORE_PLAN` = #{param.restore_plan},
+		`EFFECT` = #{param.effect},
+		`RESULT` = #{param.result},
+		`CAB` = #{param.cab},
+		`SUCCESS` = #{param.success},
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId} 
+  </insert>
+  
+  <insert id="margeObstacle" parameterType="kr.pe.lahuman.utils.DataMap">
+  	INSERT INTO `obstacle`
+	(
+		`REQ_CODE`,
+		`OBSTACLE_ST`,
+		`OBSTACLE_ET`,
+		`SERVICE_OBSTACLE_TIME`,
+		`FIRST_ACTION`,
+		`CAUSE`,
+		`PHENOMENON`,
+		`AFTER_ACTION`,
+		`PROBLEM`,
+		`REGISTER_DT`,
+		`REGISTER_ID`
+		)
+		VALUES
+		(#{param.req_code},
+		#{param.obstacle_st},
+		#{param.obstacle_et},
+		#{param.service_obstacle_time},
+		#{param.first_action},
+		#{param.cause},
+		#{param.phenomenon},
+		#{param.after_action},
+		#{param.problem},
+		<include refid="Core.nowDt"/>,
+		#{param.getLogin4UserId} 
+	)ON DUPLICATE KEY UPDATE
+	`OBSTACLE_ST` = #{param.obstacle_st},
+	`OBSTACLE_ET` = #{param.obstacle_et},
+	`SERVICE_OBSTACLE_TIME`= #{param.service_obstacle_time},
+	`FIRST_ACTION` = #{param.first_action},
+	`CAUSE` = #{param.cause},
+	`PHENOMENON`= #{param.phenomenon},
+	`AFTER_ACTION`= #{param.after_action},
+	`PROBLEM`= #{param.problem},
+	`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+	`MODIFY_ID` = #{param.getLogin4UserId} 
+  </insert>
+  
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE event SET
+  		`USE_YN` = 'N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+  	where REQ_CODE=#{param.req_code}
+  </delete>
+  <update id="changeStatus" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE event SET
+  		SETTLE = #{param.settle}
+  		,FTP = #{param.ftp} 
+  		,HELPDESK= #{param.helpdesk}
+  		,`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId} 
+  	where REQ_CODE=#{param.req_code}
+  </update>
+  
+  <select id="select" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select
+        e.REQ_CODE ,
+        e.CATEGORY_ID ,
+        e.REQ_DT ,
+        e.USER ,
+        e.USER_TEL,
+        e.REQ_TITLE ,
+        e.EMERGENCY_CODE ,
+        (SELECT C.SERVICE_ID FROM CATEGORY C WHERE C.ID =E.CATEGORY_ID  ) AS SERVICE_ID,
+        ifnull(p.PROC_TYPE , 'EV00') AS PROC_TYPE,
+        P.REQ_TYPE,
+        P.INFRA_ID,
+        e.FILE_NAME,
+        e.REQ_FILE,
+        p.RECEIPT_DT ,
+        p.PROC_USER ,
+        p.SCHEDULE_DT ,
+        p.COMPLETE_DT ,
+        p.SPEND_TIME ,
+        p.PROCESS_RT,
+        c.WORK_ST ,
+        c.WORK_ET ,
+        c.SERVICE_STOP_TIME ,
+        c.CHANGE_LOG,
+        c.WORK_PLAN ,
+        c.RESTORE_PLAN ,
+        c.REASON ,
+        c.EFFECT ,
+        c.RESULT ,
+        c.CAB ,
+        c.SUCCESS,
+        o.OBSTACLE_ST ,
+        o.OBSTACLE_ET ,
+        o.SERVICE_OBSTACLE_TIME ,
+        o.FIRST_ACTION ,
+        o.PROBLEM,
+        o.CAUSE ,
+        o.PHENOMENON ,
+        o.AFTER_ACTION ,
+        mr.MILESTONE_ID
+    from
+        event e  
+    left outer join
+        process p 
+            on e.REQ_CODE = p.REQ_CODE 
+    left outer join
+        `change` c 
+            on e.REQ_CODE = c.REQ_CODE 
+    left outer join
+        `obstacle` o 
+            on e.REQ_CODE = o.REQ_CODE
+    left join 
+    	milestone_relation mr on mr.event_type = 'E' and event_code = e.req_code
+    WHERE
+    	e.USE_YN = 'Y'
+    	AND e.REQ_CODE = #{param.req_code}
+  </select>
+  
+  <select id="commentList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  		select
+  			comment_id
+  			,req_code
+  			, req_dt
+  			, user
+  			,  (
+  				select 
+  					name 
+  				from user
+				where 
+					user_id = user
+  			) as user_name
+  			, comment
+  			, register_dt
+  			, register_id
+  			, modify_dt
+  			, modify_id
+  		from 
+  			event_comment
+  		where req_code = #{param.req_code}
+  			and use_yn ='Y'
+  		order by req_dt desc
+  </select>
+  
+  <insert id="commentMarge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  	<choose>
+		  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.comment_id)">
+		  		insert into event_comment(
+			  		req_code
+			  		, req_dt
+		  			, user
+		  			, comment
+		  			, register_dt
+		  			, register_id 
+		  		)values(
+		  			#{param.req_code},
+					#{param.req_dt},
+					#{param.user},
+					#{param.comment},
+					<include refid="Core.nowDt"/>,
+					#{param.getLogin4UserId} 
+		  		)
+		  	</when>
+		  	<otherwise>
+		  		update event_comment set
+		  			req_dt = #{param.req_dt}
+		  			, user = #{param.user}
+		  			, comment = #{param.comment}
+		  			, `MODIFY_DT` = <include refid="Core.nowDt"/> 
+					, `MODIFY_ID` = #{param.getLogin4UserId}
+				where comment_id = #{param.comment_id}
+		  	</otherwise>
+	  	</choose>
+  </insert>
+  
+  <update id="commentDelete" parameterType="kr.pe.lahuman.utils.DataMap">
+		update event_comment set
+  			use_yn = 'N'
+  			, `MODIFY_DT` = <include refid="Core.nowDt"/> 
+			, `MODIFY_ID` = #{param.getLogin4UserId}
+		where comment_id = #{param.comment_id}
+  </update>
+  
+</mapper>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.call.CallDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	concat(c.ID, '') AS ID,
+    	c.CATEGORY_ID,
+    	c.USER,
+    	c.USER_ID,
+    	c.CONTENTS,
+    	c.START_DT,
+    	c.END_DT,
+    	c.REGISTER_DT,
+    	mr.milestone_id
+	FROM `call` c left join milestone_relation mr on mr.event_type = 'S' and event_code = c.id
+	<where>
+		c.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.contents)">
+			AND c.CONTENTS like concat('%', #{param.contents}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND c.USER_ID = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(c.START_DT, 4) = #{param.year}
+		</if>
+	</where>
+	ORDER BY REGISTER_DT DESC
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT 
+     	count(*)
+	FROM `call` c left join milestone_relation mr on mr.event_type = 'S' and event_code = c.id
+	<where>
+		c.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.contents)">
+			AND c.CONTENTS like concat('%', #{param.contents}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND c.USER_ID = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(c.START_DT, 4) = #{param.year}
+		</if>
+	</where>
+  </select>
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO `call`
+			(
+			`CATEGORY_ID`,
+			`USER`,
+			`USER_ID`,
+			`CONTENTS`,
+	    	`START_DT`,
+	    	`END_DT`,
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			VALUES
+			(
+			#{param.category_id},
+			#{param.user},
+			#{param.user_id},
+			#{param.contents},
+			#{param.start_dt},
+			#{param.end_dt},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			)
+	  	</when>
+	  	<otherwise>
+	  		UPDATE `call`
+				SET
+				`CATEGORY_ID` = #{param.category_id},
+				`CONTENTS` = #{param.contents},
+				`USER_ID` = #{param.user_id},
+				`USER` = #{param.user},
+				`START_DT` = #{param.start_dt},
+				`END_DT` = #{param.end_dt},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId} 
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE `call` SET
+  		`USE_YN` = 'N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId} 
+  	where id=#{param.id}
+  </delete>
+</mapper>

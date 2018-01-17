@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.meeting.MeetingDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+       `ID`,
+	   `TITLE`,
+		`MEET_DT`,
+	   `STIME`,
+	   `ETIME`,
+	   `REGISTER_DT`,
+	   `MODIFY_DT`
+	FROM `meeting`
+	<where>
+		USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			AND TITLE LIKE CONCAT('%', #{param.title},'%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(MEET_DT, 4) = #{param.year}
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+		ORDER BY MEET_DT DESC
+	</if>
+	<include refid="Core.limit"/>
+  </select>
+  
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM `meeting`
+	<where>
+		USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			AND TITLE LIKE CONCAT('%', #{param.title},'%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(MEET_DT, 4) = #{param.year}
+		</if>
+	</where>
+  </select>
+  
+  <select id="select" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  SELECT 
+	  `ID`,
+	   `TITLE`,
+		`MEET_DT`,
+	   `STIME`,
+	   `ETIME`,
+	   `LOCATION`,
+	   `KMA_USER`,
+	    `COMPANY_USER`,
+	    `CONTENTS`,
+	    `ETC`,
+	   `REGISTER_DT`,
+	   `MODIFY_DT`
+	FROM `meeting`
+ 	WHERE ID = #{param.id} AND USE_YN='Y'
+  </select>
+
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO meeting
+			(
+				`ID`,
+				`TITLE`,
+			    `MEET_DT`,
+			    `STIME`,
+			    `ETIME`,
+			    `LOCATION`,
+			    `KMA_USER`,
+			    `COMPANY_USER`,
+			    `CONTENTS`,
+			    `ETC`,
+			    `REGISTER_DT`,
+			    `REGISTER_ID`
+				)
+				SELECT
+				CONCAT(SUBSTR( #{param.meet_dt}, 1, 4) , '-', SUBSTR( #{param.meet_dt}, 5, 4), '-', LPAD(count(1)+1, 3,0)),
+				#{param.title},
+				#{param.meet_dt},
+				#{param.stime},
+				#{param.etime},
+				#{param.location},
+				#{param.kma_user},
+				#{param.company_user},
+				#{param.contents},
+				#{param.etc},
+				<include refid="Core.nowDt"/>
+				, #{param.getLogin4UserId}		
+			FROM meeting
+			WHERE SUBSTR(ID, 1, 10) = CONCAT(SUBSTR( #{param.meet_dt}, 1, 4) , '-', SUBSTR( #{param.meet_dt}, 5, 4), '-')
+			
+	  	</when>
+	  	<otherwise>
+	  		UPDATE meeting
+				SET
+				TITLE = #{param.title},
+				MEET_DT =#{param.MEET_DT},
+				STIME=#{param.STIME},
+				ETIME=#{param.ETIME},
+				LOCATION=#{param.LOCATION},
+				KMA_USER=#{param.kma_user},
+				COMPANY_USER=#{param.company_user},
+				CONTENTS=#{param.contents},
+				ETC=#{param.etc},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE meeting SET
+  		`USE_YN` = 'N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+  	where id=#{param.id}
+  </delete>
+  
+</mapper>

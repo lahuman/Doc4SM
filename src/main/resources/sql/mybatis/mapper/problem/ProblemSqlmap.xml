@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.problem.ProblemDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	ID
+    	, PROBLEM_ST
+    	, PROBLEM_ET
+    	, TITLE
+    	, STATUS
+    	, EMERGENCY
+    	, SERVICE_EFFECT
+    	, REGISTER_DT
+    	, MODIFY_DT
+	FROM problem
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			TITLE LIKE concat('%', #{param.title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(PROBLEM_ST, 4) = #{param.year}
+		</if>
+	</where>
+	ORDER BY STATUS ASC, REGISTER_DT DESC
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM problem
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			TITLE LIKE concat('%', #{param.title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(PROBLEM_ST, 4) = #{param.year}
+		</if>
+	</where>
+  </select>
+  
+  <select id="eventList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    SELECT 
+    	O.REQ_CODE
+    	, CONCAT('[',O.REQ_CODE, ']', E.REQ_TITLE) AS REQ_TITLE 
+    FROM obstacle O , event E
+	WHERE 
+		E.REQ_CODE = O.REQ_CODE
+		AND O.PROBLEM='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(e.REQ_DT, 4) = #{param.year}
+		</if>
+	ORDER BY O.REQ_CODE DESC		
+  </select>
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO problem
+			(
+			   	 PROBLEM_ST
+			   	, PROBLEM_ET
+			   	, TITLE
+			   	, STATUS
+			   	, EMERGENCY
+			   	, SERVICE_EFFECT
+			   	, REGISTER_DT
+			   	, REGISTER_ID
+			)
+			VALUES
+			(
+			#{param.problem_st},
+			#{param.problem_et},
+			#{param.title},
+			#{param.status},
+			#{param.emergency},
+			#{param.service_effect},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			)	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE problem
+				SET
+				`PROBLEM_ST` = #{param.problem_st},
+				`PROBLEM_ET` = #{param.problem_et},
+				`TITLE` = #{param.title},
+				`STATUS` = #{param.status},
+				`EMERGENCY` = #{param.emergency},
+				`SERVICE_EFFECT` = #{param.service_effect},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM problem
+	WHERE `ID` = #{param.id}
+  </delete>
+  
+  <select id="problemRelationList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	ID
+    	, PROBLEM_ID
+    	, EVENT_REQ_CODE
+    	, `CONDITION`
+    	, CONTENTS
+    	, ETC
+    	, PROC_DT
+    	, REGISTER_DT 
+    	, MODIFY_DT
+    from problem_relation
+    where PROBLEM_ID  = #{param.problem_id}
+    order by ID
+  </select>
+  <insert id="margeRelation" parameterType="java.util.List">
+  	 <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO problem_relation
+			(
+			   	PROBLEM_ID
+		    	, EVENT_REQ_CODE
+		    	, `CONDITION`
+		    	, CONTENTS
+		    	, ETC
+		    	, PROC_DT
+			   	, REGISTER_DT
+			)
+			VALUES
+			(
+			#{param.problem_id},
+			#{param.event_req_code},
+			#{param.condition},
+			#{param.contents},
+			#{param.etc},
+			#{param.proc_dt},
+			<include refid="Core.nowDt"/>)	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE problem_relation
+				SET
+				`PROBLEM_ID` = #{param.problem_id},
+				`EVENT_REQ_CODE` = #{param.event_req_code},
+				`CONDITION` = #{param.condition},
+				`CONTENTS` = #{param.contents},
+				`ETC` = #{param.etc},
+				`PROC_DT` = #{param.proc_dt},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="deleteRelation" parameterType="kr.pe.lahuman.utils.DataMap">
+  	DELETE FROM problem_relation
+  	where id=#{param.id}
+  </delete>
+</mapper>

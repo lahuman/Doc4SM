@@ -1,0 +1,1304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.report.ReportDao">
+	<select id="eventList"  parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	SELECT 
+     	e.REQ_CODE,
+		(
+		select 
+			S.NAME
+		from service S, category C
+		where S.ID = C.SERVICE_ID and e.CATEGORY_ID = c.ID) as CATEGORY,
+		case ifnull(p.proc_type , '0')
+			when '0' then '요청'
+			when 'EV00' then '접수-처리'
+			when 'EV01' then '서비스'
+			when 'EV02' then '변경'
+			when 'EV03' then '장애'
+		END as PROCES_TYPE,
+		(
+		select 
+			C.NAME
+		from service S, category C
+		where S.ID = C.SERVICE_ID and e.CATEGORY_ID = c.ID) as MENU,
+    	CONVERT(left(str_to_date(e.REQ_DT ,'%Y%m%d%H%i%s'), 10) USING utf8) AS REQ_DT ,
+    	e.USER,
+		CONVERT(left(str_to_date(p.complete_dt ,'%Y%m%d%H%i%s'), 10) USING utf8) AS complete_dt ,
+		DATEDIFF(CONVERT(left(str_to_date(p.complete_dt ,'%Y%m%d%H%i%s'), 10) USING utf8), CONVERT(left(str_to_date(p.receipt_dt ,'%Y%m%d%H%i%s'), 10) USING utf8)) AS DIFF_DAY,
+		CONVERT(case ifnull(p.proc_type , '0')
+			when '0' then ''
+			when 'EV00' then ''
+			when 'EV01' then (concat('처리:', P.spend_time))
+			when 'EV02' then concat('처리:', P.spend_time,'/ 중지:', (select C.service_stop_time from `change` C where C.REQ_CODE = e.REQ_CODE ))
+			when 'EV03' then concat('처리:', P.spend_time, '/ 장애:', (select C.service_obstacle_time from `obstacle` C where C.REQ_CODE = e.REQ_CODE ))
+		END USING utf8) as SPEND_TIME,
+		(SELECT U.NAME FROM user U WHERE U.USER_ID =  p.proc_user) PROC_USER,
+		case ifnull(p.proc_type , '0')
+			when '0' then '대기'
+			when 'EV00' then '처리중'
+			when 'EV01' then '완료'
+			when 'EV02' then '완료'
+			when 'EV03' then '완료'
+		END as `STATUS`,
+		e.REQ_TITLE,
+		case ifnull(p.proc_type , '0')
+			when '0' then ''
+			when 'EV00' then ''
+			when 'EV01' then (P.process_rt)
+			when 'EV02' then (select C.result from `change` C where C.REQ_CODE = e.REQ_CODE )
+			when 'EV03' then (select C.after_action from `obstacle` C where C.REQ_CODE = e.REQ_CODE )
+		END as RESULT
+	FROM event e  left outer join process p on e.REQ_CODE = p.REQ_CODE
+	<where>
+		e.USE_YN ='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_type)">
+			<choose>
+				<when test='param.proc_type.equals("0")'>
+					AND p.proc_type is null
+				</when>
+				<when test='param.proc_type.equals("1")'>
+					AND ( p.proc_type = 'EV01' OR p.proc_type = 'EV02' OR p.proc_type = 'EV03')
+				</when>
+				<otherwise>
+					AND p.proc_type = #{param.proc_type} 
+				</otherwise> 
+			</choose>
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_title)">
+			AND e.REQ_TITLE like concat('%', #{param.req_title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND p.PROC_USER = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.req_dt)">
+			AND left(e.req_dt, 6) = #{param.req_dt}
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+		ORDER BY e.REQ_CODE
+	</if>
+	</select>
+  <select id="getInfraIds4Process" parameterType="kr.pe.lahuman.utils.DataMap" resultType="String">
+  	SELECT 
+  		INFRA_ID 
+  	FROM `PROCESS` 
+  	WHERE
+  		REQ_CODE = #{param.req_code}
+  </select>
+  <select id="event" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select
+        e.REQ_CODE ,
+        e.CATEGORY_ID ,
+        CONVERT(left(str_to_date(e.REQ_DT ,'%Y%m%d%H%i%s'), 16) USING utf8)AS REQ_DT,
+        e.USER ,
+        e.USER_TEL,
+        e.REQ_TITLE ,
+        (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='EMGC' AND  C.CODE = e.EMERGENCY_CODE) AS EMERGENCY_CODE,
+        (
+		select 
+			CONCAT(S.NAME, '-', C.NAME) AS SERVICE_CATEGORY_NM
+		from service S, category C
+		where S.ID = C.SERVICE_ID and e.CATEGORY_ID = c.ID) as CATEGORY_NM,
+        ifnull(p.PROC_TYPE , 'EV01') AS PROC_TYPE,
+        p.REQ_TYPE,
+        <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.INFRA_IDS)">
+	        (SELECT GROUP_CONCAT(I.USE_TITLE SEPARATOR '\r\n') FROM infrastructure I WHERE I.ID IN (${param.INFRA_IDS})) as INFRA_NM,
+	        (SELECT GROUP_CONCAT(CD.NAME) FROM infrastructure I, CODE CD WHERE CD.CODE_MASTER='HWSW' AND CD.CODE=I.`DIVISION` AND I.ID IN (${param.INFRA_IDS}) ) as INFRA_TYPE,
+        </if>
+        <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.INFRA_IDS)">
+        	'' as INFRA_NM,
+        	'기타' as INFRA_TYPE,
+        </if>
+        IFNULL(e.FILE_NAME, '-') as FILE_NAME,
+        IFNULL(e.REQ_FILE, '-') as REQ_FILE,
+        CONVERT(left(str_to_date(p.RECEIPT_DT  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS RECEIPT_DT ,
+        (SELECT U.NAME FROM user U WHERE U.USER_ID =  p.proc_user) PROC_USER,
+        (SELECT U.TEL FROM user U WHERE U.USER_ID =  p.proc_user) PROC_TEL,
+        CONVERT(left(str_to_date(p.SCHEDULE_DT   ,'%Y%m%d%H%i%s'), 16) USING utf8)AS SCHEDULE_DT ,
+        CONVERT(left(str_to_date(p.COMPLETE_DT    ,'%Y%m%d%H%i%s'), 16) USING utf8)AS COMPLETE_DT ,
+        changeHourNMinute(p.SPEND_TIME) AS SPEND_TIME ,
+        TIME_FORMAT(TIMEDIFF(str_to_date(p.SCHEDULE_DT   ,'%Y%m%d%H%i%s'),str_to_date(p.RECEIPT_DT  ,'%Y%m%d%H%i%s')), '%H:%i') AS EXPECT_TIME,        
+        p.PROCESS_RT,
+        CONVERT(left(str_to_date(c.WORK_ST    ,'%Y%m%d%H%i%s'), 16) USING utf8)AS WORK_ST         ,
+        CONVERT(left(str_to_date(c.WORK_ET    ,'%Y%m%d%H%i%s'), 16) USING utf8)AS WORK_ET         ,
+        changeHourNMinute(c.SERVICE_STOP_TIME) AS SERVICE_STOP_TIME,
+        c.CHANGE_LOG,
+        c.WORK_PLAN , 
+        c.RESTORE_PLAN ,
+        c.REASON ,
+        c.EFFECT ,
+        c.RESULT ,
+        case c.SUCCESS
+			when 'Y' then '성공'
+			when 'N' then '실패'
+			when 'C' then '취소'
+		END as SUCCESS, 
+        ifnull(c.CAB, '') CAB ,
+        CONVERT(left(str_to_date(o.OBSTACLE_ST    ,'%Y%m%d%H%i%s'), 16) USING utf8)AS OBSTACLE_ST         ,
+        CONVERT(left(str_to_date(o.OBSTACLE_ET    ,'%Y%m%d%H%i%s'), 16) USING utf8)AS OBSTACLE_ET         ,
+        changeHourNMinute(o.SERVICE_OBSTACLE_TIME) AS SERVICE_OBSTACLE_TIME ,
+        o.FIRST_ACTION ,
+        o.CAUSE ,
+        o.PHENOMENON ,
+        o.AFTER_ACTION,
+        o.PROBLEM,
+		(SELECT CONVERT(Ifnull(Concat(Group_concat(DISTINCT concat('[PMT-',(PR.PROBLEM_ID),'] ') SEPARATOR '\r\n')), 
+               '') USING utf8) from problem_relation  PR  where PR.EVENT_REQ_CODE = P.REQ_CODE) AS PROBLEM_ID
+    from
+        event e  
+    left outer join
+        process p 
+            on e.REQ_CODE = p.REQ_CODE 
+    left outer join
+        `change` c 
+            on e.REQ_CODE = c.REQ_CODE 
+    left outer join
+        `obstacle` o 
+            on e.REQ_CODE = o.REQ_CODE
+    WHERE
+    	e.USE_YN='Y' AND
+    	e.REQ_CODE = #{param.req_code}
+  </select>
+  
+  <select id="call" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+   SELECT 
+     	ID,
+    	(
+		select 
+			CONCAT(S.NAME, '-', C.NAME) AS SERVICE_CATEGORY_NM
+		from service S, category C
+		where S.ID = C.SERVICE_ID and `call`.CATEGORY_ID = c.ID) as CATEGORY_NM,
+    	USER,
+    	(SELECT NAME FROM USER U WHERE U.USER_ID  = `call`.USER_ID) AS USER_ID,
+    	CONTENTS,
+    	CONVERT(left(str_to_date(`START_DT`  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS `START_DT`,
+    	CONVERT(left(str_to_date(`END_DT`  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS `END_DT`
+	FROM `call`
+	<where>
+		USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.contents)">
+			AND CONTENTS like concat('%', #{param.contents}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.proc_user)">
+			AND USER_ID = #{param.proc_user}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(START_DT, 4) = #{param.year}
+		</if>
+	</where>
+  </select>
+  <select id="meeting" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	SELECT 
+		`ID`,
+	   `TITLE`,
+		CONVERT(left(str_to_date(`MEET_DT`  ,'%Y%m%d%H%i%s'), 10) USING utf8) AS `MEET_DT`,
+	    CONCAT(SUBSTR(`STIME`, 1,2), ':', SUBSTR(`STIME`, 3,4)) AS STIME,
+		CONCAT(SUBSTR(`ETIME`, 1,2), ':', SUBSTR(`ETIME`, 3,4)) AS ETIME,
+		LOCATION,
+	    REPLACE(`KMA_USER`, ',', '\r\n') AS KMA_USER,
+		REPLACE(`COMPANY_USER`, ',', '\r\n') AS `COMPANY_USER`,
+	    `CONTENTS`,
+	    `ETC`
+	FROM `meeting`
+ 	WHERE ID = #{param.id} AND USE_YN='Y'
+  </select>
+  <select id="infraList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    SELECT 
+     	`ID`,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='HWSW' AND  C.CODE = `DIVISION`) AS DIVISION,
+		(SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='EMGC' AND  C.CODE = `EMERGENCY_TYPE`) AS EMERGENCY_TYPE,
+	   `OWN_GROUP`,
+	   `OFFER_USER`,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='SVST' AND  C.CODE = `SERVICE_STATUS`) AS SERVICE_STATUS,
+	   `USE_TITLE`,
+	   (SELECT U.NAME FROM user U WHERE U.USER_ID =  `MARK_ID`) MARK_NAME,
+	   `MODEL_NAME`,
+	   `REGISTER_DT`,
+	   `MODIFY_DT`
+	FROM `infrastructure`
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.division)">
+			DIVISION = #{param.division}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.use_title)">
+			USE_TITLE LIKE CONCAT('%', #{param.use_title},'%')
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+  </select>
+  <select id="infra" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    SELECT 
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='HWSW' AND  C.CODE = `DIVISION`) DIVISION ,
+	   `DIVISION` AS TYPE,
+	   `RESOURCE_NUM`,
+	   `EMERGENCY_TYPE`,
+	   CONVERT(left(str_to_date(`INSTALL_DT` ,'%Y%m%d'), 16) USING utf8) AS `INSTALL_DT`,
+	   `OWN_GROUP`,
+	   `OFFER_USER`,
+	   (SELECT NAME FROM `CODE` C WHERE C.`CODE` = `SERVICE_STATUS` AND CODE_MASTER='SVST') AS `SERVICE_STATUS`,
+	   `USE_TITLE`,
+	   (SELECT NAME FROM USER U WHERE U.USER_ID  = MARK_ID) AS MARKER,
+	   (SELECT NAME FROM `CODE` C WHERE C.`CODE` = `LICENSE` AND CODE_MASTER='LICE') AS `LICENSE`,
+	   CONVERT(`LICENSE_COUNT` USING utf8) AS `LICENSE_COUNT`,
+	   `ADJUNCTION`,
+	   (SELECT COMPANY_NAME FROM COMPANY C WHERE C.ID  = `COMPANY_ID`) AS `COMPANY`,
+	   `MODEL_NAME`,	
+	   `SERIAL_NO`,
+	   `HOST_NAME`,
+	   `IP_ADDRESS`,
+	   `REAL_LOCATION`,
+	   `CPU`,
+	   `MEMORY`,
+	   `OS`,
+	   `INSIDE_DISK`,
+	   `OUTSIDE_DISK`,
+		Ifnull((select group_concat(I.USE_TITLE SEPARATOR '\r\n, ') from infrastructure I
+where I.id in (select J.join_id from infra_join J where J.infra_id =`infrastructure`.ID )), '') AS INFRA_JOINS
+
+, (select group_concat(GC.CHANGE_LOG SEPARATOR '\r\n') FROM (
+		select 
+			Ifnull(Concat('□ ', EL.title ),'') AS CHANGE_LOG 
+		from event_log EL 
+		where 
+			concat(',',EL.infra_id,',') like concat('%,',#{param.id},',%') 
+			and proc_type = 'EV02'
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+				AND left(REQ_DT, 4) = #{param.year}
+			</if>
+		UNION ALL
+ 		select 
+ 			Ifnull(Concat('□ ', concat("[",EW.ID,"]",  EW.WORK_NAME) ), '')  AS CHANGE_LOG 
+ 		from external_work EW 
+		where 
+			WORK_CODE='EW01'
+			AND concat(',',EW.infra_id,',') like concat('%,',#{param.id},',%') 
+			<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+				AND left(WORK_ST, 4) = #{param.year}
+			</if>
+		) GC)
+		   AS CHANGE_LOG
+               
+,(select Ifnull(Concat('□ ', Group_concat(EL.title SEPARATOR '\r\n□ ')), 
+               '')  from event_log EL where concat(',',EL.infra_id,',') like concat('%,',`infrastructure`.ID,',%') and proc_type = 'EV03' 
+               <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+				AND left(REQ_DT, 4) = #{param.year}
+				</if>
+               ) AS OBSTACLE_LOG
+,(select  CONVERT(Ifnull(Concat('□ ', Group_concat(concat('[PMT-',P.ID,'] ',P.TITLE) SEPARATOR '\r\n□ ')), 
+               '') USING utf8) AS TITLE  from problem P 
+where 	
+		P.ID in (select (problem_id) from problem_relation pr where pr.event_req_code IN (select EL.req_code from event_log EL where concat(',',EL.infra_id,',') like concat('%,',`infrastructure`.ID,',%') and proc_type = 'EV03'))
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(P.PROBLEM_ST, 4) = #{param.year}
+		</if>
+		) AS PROBLEM_LOG               
+	FROM `infrastructure`
+ 	WHERE ID = #{param.id}
+  </select>
+  
+  <sql id="dailyLastDt">
+  		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.lastDt)">
+       	Date_format(Str_to_date(#{param.lastDt}, '%Y%m%d')
+       </if>
+       <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.lastDt)">
+        Date_format(Date_add(Str_to_date(#{param.date}, '%Y%m%d'), INTERVAL 
+                           -1 day)
+       </if>,'%Y%m%d')
+  </sql>
+  
+  <select id="daily" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	SELECT
+  	 CONVERT(left(str_to_date(#{param.date} ,'%Y%m%d'), 10) USING utf8)	 AS TODATE,
+  	 (SELECT Ifnull(Concat('□ ', Group_concat(contents SEPARATOR '\r\n□ ')), 
+               '') 
+        FROM   `call` 
+        WHERE  
+        USE_YN='Y' AND 
+        <include refid="dailyLastDt"></include>
+         BETWEEN LEFT(start_dt, 8) AND LEFT(end_dt, 8)) 
+       Y_ETC, 
+       (SELECT Ifnull(Concat('□ ', Group_concat(contents SEPARATOR '\r\n□ ')), 
+               '') 
+        FROM   `call` 
+        WHERE USE_YN='Y' AND  #{param.date} BETWEEN LEFT(start_dt, 8) AND LEFT(end_dt, 8)) 
+       T_ETC, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', e.req_title) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM (
+			select e.req_code, 
+			CONCAT(e.req_title,
+		        IFNULL((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = 
+		        <include refid="dailyLastDt"></include>
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         <include refid="dailyLastDt"></include>
+		        )))) AS req_title        
+	        FROM event e 
+	               LEFT OUTER JOIN process p 
+	                            ON e.req_code = p.req_code 
+	        WHERE  p.proc_type = 'EV01'  AND e.USE_YN='Y'
+	               AND 
+	        <include refid="dailyLastDt"></include> BETWEEN LEFT(e.req_dt, 8) AND 
+	                                         LEFT(p.complete_dt, 8)       
+        UNION ALL
+          select e.req_code, 
+          CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = 
+		        <include refid="dailyLastDt"></include>
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         <include refid="dailyLastDt"></include>
+		        )))) AS req_title        
+	        FROM event e 
+	               LEFT OUTER JOIN process p 
+	                            ON e.req_code = p.req_code 
+	        WHERE  (p.proc_type = 'EV00' OR p.proc_type IS null ) AND e.USE_YN='Y'
+	               AND 
+	        <include refid="dailyLastDt"></include> &gt;= LEFT(e.req_dt, 8)   
+                                                              
+        ) e)
+                                                              AS Y_PROCESS, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', 
+       		CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = #{param.date}
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         #{param.date}
+		        ))))
+			       ) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM   event e 
+               LEFT OUTER JOIN process p 
+                            ON e.req_code = p.req_code 
+        WHERE  p.proc_type = 'EV02' AND e.USE_YN='Y'
+               AND #{param.date} BETWEEN LEFT(e.req_dt, 8) AND 
+                                      LEFT(p.complete_dt, 8)) AS 
+       T_CHANGE, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', 
+       CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = 
+		        <include refid="dailyLastDt"></include>
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         <include refid="dailyLastDt"></include>
+		        )))
+		        ) 
+       ) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM   event e 
+               LEFT OUTER JOIN process p 
+                            ON e.req_code = p.req_code 
+        WHERE  p.proc_type = 'EV02'  AND e.USE_YN='Y'
+               AND 
+              <include refid="dailyLastDt"></include> BETWEEN LEFT(e.req_dt, 8) AND 
+                                         LEFT(p.complete_dt, 8)) 
+                                                              AS Y_CHANGE, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', e.req_title) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM  
+        
+        (
+			select e.req_code, 
+			CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt =#{param.date}		        
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         #{param.date}
+		        )))
+		        ) 
+			AS req_title        
+	        FROM event e 
+	               LEFT OUTER JOIN process p 
+	                            ON e.req_code = p.req_code 
+	        WHERE  p.proc_type = 'EV01' AND e.USE_YN='Y'
+	        AND #{param.date} BETWEEN LEFT(e.req_dt, 8) AND 
+                                      LEFT(p.complete_dt, 8)
+        UNION ALL
+          select e.req_code,  
+          CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = #{param.date}		        
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         #{param.date}
+		        )))
+		        ) 
+          AS req_title        
+	        FROM event e 
+	               LEFT OUTER JOIN process p 
+	                            ON e.req_code = p.req_code 
+	        WHERE  (p.proc_type = 'EV00' OR p.proc_type IS null ) AND e.USE_YN='Y'
+				AND #{param.date} &gt;= LEFT(e.req_dt, 8)    
+        ) e)
+                                       AS 
+       T_PROCESS, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', 
+       		CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = 
+		        <include refid="dailyLastDt"></include>
+		        ),  (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         <include refid="dailyLastDt"></include>
+		        )))
+		        ) 
+       ) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM   event e 
+               LEFT OUTER JOIN process p 
+                            ON e.req_code = p.req_code  
+        WHERE  p.proc_type = 'EV03' AND e.USE_YN='Y'
+               AND 
+        <include refid="dailyLastDt"></include> BETWEEN LEFT(e.req_dt, 8) AND 
+                                         LEFT(p.complete_dt, 8)) 
+                                                              AS Y_OBSTACLE, 
+       (SELECT Ifnull(Group_concat(Concat('□ ', e.req_code, '_', 
+              		CONCAT(e.req_title,
+		        ifnull((SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), null)
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		        and ec.req_dt = #{param.date} 
+		        ), (SELECT Ifnull(CONCAT('\r\n  - ', Group_concat(`comment` SEPARATOR '\r\n  - ')), '')
+		        from event_comment ec
+		        where ec.req_code = e.req_code
+		            AND ec.req_dt = (SELECT MAX(EC2.req_dt ) FROM event_comment ec2 where ec.req_code = ec2.req_code and ec2.req_dt &lt; 
+		         <include refid="dailyLastDt"></include>
+		        )))
+		        )
+       ) 
+                      SEPARATOR 
+                      '\r\n') 
+               , '') 
+        FROM   event e 
+               LEFT OUTER JOIN process p 
+                            ON e.req_code = p.req_code  
+        WHERE  p.proc_type = 'EV03' AND e.USE_YN='Y'
+               AND #{param.date} BETWEEN LEFT(e.req_dt, 8) AND 
+                                      LEFT(p.complete_dt, 8)) AS 
+       T_OBSTACLE, 
+       (SELECT Ifnull(Concat('□ ', Group_concat(concat('[', (SELECT COMPANY_NAME FROM COMPANY WHERE `EXTERNAL_WORK`.COMPANY_ID = `COMPANY`.ID) , ':',  WORKER,']', work_name ) SEPARATOR '\r\n□ ')),  
+               '') 
+        FROM   external_work 
+        WHERE  USE_YN='Y' AND #{param.date} BETWEEN LEFT(work_st, 8) AND LEFT(work_et, 8)) 
+       AS 
+       EXTERNAL_WORK 
+  </select>
+  <select id="problem" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	SELECT CONVERT(`ID` USING utf8) AS PROBLEM_ID,
+	    CONVERT(left(str_to_date(`PROBLEM_ST`  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS `PROBLEM_ST`,
+		CONVERT(left(str_to_date(`PROBLEM_ET`  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS `PROBLEM_ET`,
+	    `TITLE`,
+	    if(`STATUS` = 'Y', '종료','진행중') as `STATUS`,
+		(select name from `code` C where C.`code` =  `EMERGENCY` and code_master='EMGC') AS EMERGENCY,
+	    if(`SERVICE_EFFECT` = 'Y', '영향있음','영향없음') as `SERVICE_EFFECT`
+	FROM `problem`
+	WHERE `ID` = #{param.problem_id}
+  </select>
+  <select id="problemRelation" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	 SELECT 
+	 	PR.`ID`,
+	    PR.`EVENT_REQ_CODE`,
+	    (SELECT NAME FROM `CODE` C WHERE C.`CODE` =  PR.`CONDITION` AND CODE_MASTER='PBLM') AS `CONDITION`,
+	    PR.`CONTENTS`,
+	    PR.`ETC`,
+		(SELECT REQ_TITLE FROM `EVENT` E WHERE E.REQ_CODE = P.REQ_CODE) AS EVENT_TITLE,
+		CONVERT(left(str_to_date(PR.PROC_DT  ,'%Y%m%d%H%i%s'), 16) USING utf8) AS END_DT,
+		(SELECT NAME FROM USER U WHERE U.USER_ID  = P.PROC_USER) AS PROC_USER
+	FROM `PROBLEM_RELATION` PR LEFT JOIN `PROCESS` P ON P.REQ_CODE = PR.EVENT_REQ_CODE
+	WHERE PROBLEM_ID = #{param.problem_id}
+  </select>
+  <select id="versionInfo" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	SELECT 
+  		SVN_VERSION
+  		, VERSION
+  		, AUTHOR
+  		, CONVERT(left(str_to_date(REGISTER_DT ,'%Y%m%d%H%i%s'), 16) USING utf8) AS REGISTER_DT
+  	FROM version_info 
+  	WHERE id=#{param.req_code} and KIND_CD='I'
+  </select>
+  
+  <select id="vacationList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+   select 
+    	id
+    	, (select name from user u where u.user_id = v.vacation_user) vacation_user
+		, (select name from user u where u.user_id = v.agent_user) agent_user
+    	, (SELECT 5 * (DATEDIFF(END_DT, START_DT  ) DIV 7) + MID('0123444401233334012222340111123400012345001234550',
+    	 	7 * WEEKDAY(START_DT ) + WEEKDAY(END_DT) + 1, 1) + 1
+    	 	- (SELECT COUNT(1) FROM HOLIDAY_DATE WHERE HOLIDAY &gt;= START_DT   AND HOLIDAY &lt;= END_DT)) 
+    	 as VACATION_DT
+    	, start_dt
+    	, end_dt
+    	, (select name from code c where c.code_master='VACA' and c.code = v.vacation_kind) vacation_kind
+    	, detail
+    	, register_dt
+    	, modify_dt 
+    from vacation v
+    <where>
+    	use_yn='Y'
+	    <if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.vacation_user)' >
+	    	AND vacation_user = #{param.vacation_user}
+	    </if>
+	    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(START_DT, 4) = #{param.year}
+		</if>
+    </where>
+    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+		ORDER BY START_DT DESC
+	</if>
+  </select>
+  <select id="vacation" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  	SELECT
+	  		STR_TO_DATE(VC.START_DT  ,'%Y%m%d') START_DT
+			, CONVERT(CONCAT(STR_TO_DATE(VC.START_DT  ,'%Y%m%d') , '~', STR_TO_DATE(VC.END_DT ,'%Y%m%d') , ' (', (SELECT 5 * (DATEDIFF(END_DT, START_DT  ) DIV 7) + MID('0123444401233334012222340111123400012345001234550',
+    	 	7 * WEEKDAY(START_DT ) + WEEKDAY(END_DT) + 1, 1) + 1
+    	 	- (SELECT COUNT(1) FROM HOLIDAY_DATE WHERE HOLIDAY &gt;= START_DT   AND HOLIDAY &lt;= END_DT)) , '일)') USING utf8) as VACATION_DT
+			, (SELECT NAME FROM `CODE` C WHERE C.`CODE` =  VC.VACATION_KIND AND CODE_MASTER='VACA') AS `VACATION_KIND`
+			, VC.DETAIL
+			, VU.NAME AS UNAME
+			, (SELECT COMPANY_NAME FROM COMPANY C WHERE C.ID  = VU.COMPANY_ID) AS `UCOMPANY`
+			, (SELECT NAME FROM `CODE` C WHERE C.`CODE` =  VU.POSITION AND CODE_MASTER='RANK') AS `UPOSITION`
+			, VU.CHARGE_WORK AS UCHARGE_WORK
+			, VU.TEL AS UTEL
+			, VA.NAME AS ANAME
+			, (SELECT COMPANY_NAME FROM COMPANY C WHERE C.ID  = VA.COMPANY_ID) AS `ACOMPANY`
+			, (SELECT NAME FROM `CODE` C WHERE C.`CODE` =  VA.POSITION AND CODE_MASTER='RANK') AS `APOSITION`
+			, VA.CHARGE_WORK AS ACHARGE_WORK
+			, VA.TEL AS ATEL
+	  	FROM VACATION VC, USER VU, USER VA
+		WHERE 
+			VC.VACATION_USER = VU.USER_ID
+			AND VC.AGENT_USER = VA.USER_ID
+			AND VC.ID =#{param.id}
+  </select>
+  
+  <select id="external" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	select 
+		cd.`name` work_type
+		, cp.COMPANY_NAME
+		, ew.WORK_NAME
+		, ew.WORKER
+		, ew.USER
+		, u.name AS manager
+		, ew.WORK_ST
+		, ew.WORK_ET
+		, (select group_concat(I.use_title) from infrastructure I where concat(',',ew.INFRA_ID,',') like concat('%,',I.id,',%')) AS target
+	from external_work ew, `code` cd , company cp, user u
+	where ew.work_code = cd.`code` and ew.company_id = cp.id and ew.manager_id = u.user_id
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.work_name)">
+			AND ew.WORK_NAME LIKE CONCAT('%', ${param.work_name}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.company_id)">
+			AND ew.COMPANY_ID = ${param.company_id}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(WORK_ST, 4) = #{param.year}
+		</if>
+	ORDER BY ew.WORK_ST DESC
+  </select>
+  
+  <!--
+  SLM 문서 관련 report SQL 
+   -->
+  <select id="infrastructureInfo" resultType="kr.pe.lahuman.utils.DataMap">
+		  /*
+		시설 현황 정보
+		H101 서버
+		H102 네트워크
+		H103 스토리지
+		H104 백업장비
+		*/
+		select 
+			sum(if(DIVISION  = 'H101', 1, 0)) AS I_H101, 
+			sum(if(DIVISION  = 'H102', 1, 0)) AS I_H102, 
+			sum(if(DIVISION  = 'H103', 1, 0)) AS I_H103, 
+			sum(if(DIVISION  = 'H104', 1, 0)) AS I_H104, 
+			sum(1) AS I_TOTAL
+		from infrastructure 
+		where 
+		DIVISION like 'H1%'
+  </select>
+  
+  <select id="obstacle4CountNTime" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		/*
+		분류별 장애 건수  시간
+		*/
+		select  
+			ifnull(TRUNCATE(sum(a.SERVICE_OBSTACLE_TIME)/sum(a.cnt), 0), 0) AS <if test="param.type != null and param.type.equals('HW')">H_TIME</if><if test="param.type != null and param.type.equals('SW')">S_TIME</if>
+			,ifnull(sum(a.cnt), 0) AS <if test="param.type != null and param.type.equals('HW')">H_CNT</if><if test="param.type != null and param.type.equals('SW')">S_CNT</if>
+		from code c, (
+			select 
+				sum(o.SERVICE_OBSTACLE_TIME) AS SERVICE_OBSTACLE_TIME  
+				,count(1) cnt
+				, (
+				select 
+					max(division)
+				from infrastructure i
+				where 
+					concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+				) AS KIND
+			, substr(p.receipt_dt, 1, 6) AS MON
+			from 
+				event e
+				, obstacle o
+				, process p
+			where
+				e.req_code = o.req_code
+				and e.req_code = p.REQ_CODE 
+				and p.receipt_dt between ${param.start_time} and ${param.end_time}
+				and e.USE_YN = 'Y' 
+				and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+			GROUP BY KIND, MON
+		
+			) A
+		where A.KIND = C.code
+			 and c.code like 
+			 <if test="param.type != null and param.type.equals('HW')">
+			 'H1%'
+			 </if>
+			 <if test="param.type != null and param.type.equals('SW')">
+			 'H2%'
+			 </if>
+  </select>
+  
+   <select id="obstacle4LevelCountNTime" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		/*
+		등급별 장애 건수시간
+		*/
+		select 
+			ifnull(sum(if(EMERGENCY_CODE  = 'E001', cnt, 0)), 0) AS <if test="param.type != null and param.type.equals('HW')">H_E001</if><if test="param.type != null and param.type.equals('SW')">S_E001</if>, 
+			ifnull(sum(if(EMERGENCY_CODE  = 'E002', cnt, 0)), 0) AS <if test="param.type != null and param.type.equals('HW')">H_E002</if><if test="param.type != null and param.type.equals('SW')">S_E002</if>, 
+			ifnull(sum(if(EMERGENCY_CODE  = 'E003', cnt, 0)), 0) AS <if test="param.type != null and param.type.equals('HW')">H_E003</if><if test="param.type != null and param.type.equals('SW')">S_E003</if>, 
+			ifnull(sum(if(EMERGENCY_CODE  = 'E004', cnt, 0)), 0) AS <if test="param.type != null and param.type.equals('HW')">H_E004</if><if test="param.type != null and param.type.equals('SW')">S_E004</if>, 	
+			ifnull(sum(if(EMERGENCY_CODE  = 'E005', cnt, 0)), 0) AS <if test="param.type != null and param.type.equals('HW')">H_E005</if><if test="param.type != null and param.type.equals('SW')">S_E005</if>
+		 from (
+		select 
+		count(1) cnt
+		, (
+			select 
+				max(division)
+			from infrastructure i
+			where 
+				concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+			) AS KIND
+		, e.EMERGENCY_CODE
+		from 
+			event e
+			, obstacle o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE 
+			and p.receipt_dt between ${param.start_time} and ${param.end_time}
+			and e.USE_YN = 'Y' 
+			and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+		GROUP BY e.EMERGENCY_CODE, KIND
+			) A
+		 where 
+			A.KIND like 
+		<if test="param.type != null and param.type.equals('HW')">
+			'H1%'
+		</if>
+		<if test="param.type != null and param.type.equals('SW')">
+			'H2%'
+		</if>
+  </select>
+  
+  
+  <select id="obstacle4Kind" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		/*시설별 장애 현황 */
+		select 
+			<if test="param.isProblem != null and param.isProblem.equals('N'.toString())">
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H101', cnt, 0)) AS E001_H101, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H101', cnt, 0)) AS E002_H101, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H101', cnt, 0)) AS E003_H101, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H101', cnt, 0)) AS E004_H101, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H101', cnt, 0)) AS E005_H101, 
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H102', cnt, 0)) AS E001_H102, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H102', cnt, 0)) AS E002_H102, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H102', cnt, 0)) AS E003_H102, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H102', cnt, 0)) AS E004_H102, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H102', cnt, 0)) AS E005_H102, 
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H103', cnt, 0)) AS E001_H103, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H103', cnt, 0)) AS E002_H103, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H103', cnt, 0)) AS E003_H103, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H103', cnt, 0)) AS E004_H103, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H103', cnt, 0)) AS E005_H103, 
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H104', cnt, 0)) AS E001_H104, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H104', cnt, 0)) AS E002_H104, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H104', cnt, 0)) AS E003_H104, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H104', cnt, 0)) AS E004_H104, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H104', cnt, 0)) AS E005_H104, 
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H201', cnt, 0)) AS E001_H201, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H201', cnt, 0)) AS E002_H201, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H201', cnt, 0)) AS E003_H201, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H201', cnt, 0)) AS E004_H201, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H201', cnt, 0)) AS E005_H201, 
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H202', cnt, 0)) AS E001_H202, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H202', cnt, 0)) AS E002_H202, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H202', cnt, 0)) AS E003_H202, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H202', cnt, 0)) AS E004_H202, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H202', cnt, 0)) AS E005_H202,
+			sum(if(EMERGENCY_CODE  = 'E001' AND CODE = 'H203', cnt, 0)) AS E001_H203, 
+			sum(if(EMERGENCY_CODE  = 'E002' AND CODE = 'H203', cnt, 0)) AS E002_H203, 
+			sum(if(EMERGENCY_CODE  = 'E003' AND CODE = 'H203', cnt, 0)) AS E003_H203, 
+			sum(if(EMERGENCY_CODE  = 'E004' AND CODE = 'H203', cnt, 0)) AS E004_H203, 
+			sum(if(EMERGENCY_CODE  = 'E005' AND CODE = 'H203', cnt, 0)) AS E005_H203,
+			sum(if(CODE = 'H101', cnt, 0)) AS T_H101,
+			sum(if(CODE = 'H102', cnt, 0)) AS T_H102,
+			sum(if(CODE = 'H103', cnt, 0)) AS T_H103,
+			sum(if(CODE = 'H104', cnt, 0)) AS T_H104,
+			sum(if(CODE = 'H201', cnt, 0)) AS T_H201,
+			sum(if(CODE = 'H202', cnt, 0)) AS T_H202,
+			sum(if(CODE = 'H203', cnt, 0)) AS T_H203
+			</if>
+			<if test="param.isProblem != null and param.isProblem.equals('Y'.toString())">
+			sum(if(EMERGENCY_CODE  = 'E001' , cnt, 0)) AS P_E001, 
+			sum(if(EMERGENCY_CODE  = 'E002' , cnt, 0)) AS P_E002, 
+			sum(if(EMERGENCY_CODE  = 'E003' , cnt, 0)) AS P_E003, 
+			sum(if(EMERGENCY_CODE  = 'E004' , cnt, 0)) AS P_E004, 
+			sum(if(EMERGENCY_CODE  = 'E005' , cnt, 0)) AS P_E005
+			</if>
+		 from (
+		select 
+			count(1) cnt
+			, (
+			select 
+				max(division)
+			from infrastructure i
+			where 
+				concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+			) AS KIND
+		, substr(p.receipt_dt, 1, 6) AS MON
+		, e.EMERGENCY_CODE
+		from 
+			event e
+			, obstacle o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE 
+			and p.receipt_dt between ${param.start_time} and ${param.end_time}
+			and e.USE_YN = 'Y' 
+			and e.REQ_CODE 
+			<if test="param.isProblem != null and param.isProblem.equals('N'.toString())">
+				not 
+			</if>
+			in (select EVENT_REQ_CODE from problem_relation)
+		GROUP BY KIND, MON, e.EMERGENCY_CODE
+			) A, code c
+		where c.code_master = 'HWSW'
+		 AND c.code = A.kind
+  </select>
+  
+  <select id="obstacle4Time" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	/* 시간별 장애 현황  */
+	select 
+		sum(if(A.SERVICE_OBSTACLE_TIME &lt;60 , 1, 0)) AS LESS_60,
+		sum(if(A.SERVICE_OBSTACLE_TIME &gt;=60 and A.SERVICE_OBSTACLE_TIME &lt; 120 , 1, 0)) AS LESS_120,
+		sum(if(A.SERVICE_OBSTACLE_TIME &gt;=120 and A.SERVICE_OBSTACLE_TIME &lt; 240 , 1, 0)) AS LESS_240,
+		sum(if(A.SERVICE_OBSTACLE_TIME &gt;=240 and A.SERVICE_OBSTACLE_TIME &lt; 480 , 1, 0)) AS LESS_480,
+		sum(if(A.SERVICE_OBSTACLE_TIME &gt;=480 , 1, 0)) AS OVER_480,
+		count(1) L_CNT
+	from (
+	select 
+		o.SERVICE_OBSTACLE_TIME 
+	from 
+		event e
+		, obstacle o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE 
+		and p.receipt_dt between  ${param.start_time} and ${param.end_time}
+		and e.USE_YN = 'Y' 
+		and e.EMERGENCY_CODE &lt;&gt; 'E005'
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+	) A
+  </select>
+
+
+  <select id="service4Day" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	/* 서비스 적기일율 */
+		select  
+			sum(if( diff_day &lt; 2, 1, 0)) AS LESS_3DAY,
+			sum(if( diff_day &gt;= 2 and diff_day &lt; 4, 1, 0)) AS LESS_5DAY,
+			sum(if( diff_day &gt;= 4 and diff_day &lt; 6, 1, 0)) AS LESS_7DAY,
+			sum(if( diff_day &gt;= 6 and diff_day &lt; 13, 1, 0)) AS LESS_14DAY,
+			sum(if( diff_day &gt;= 13, 1, 0)) AS OVER_14DAY
+			, count(1) AS DAY_CNT
+			, (select count(*) from event e left join process p on e.req_code = p.req_code where e.use_yn ='N' and p.proc_type='EV01' and p.receipt_dt between ${param.start_time} and ${param.end_time}) AS DAY_CANCEL_CNT
+		 from (
+		
+		select (5 * (DATEDIFF(complete, receipt) DIV 7) + MID('0123444401233334012222340111123400012345001234550', 7 * WEEKDAY(receipt) + WEEKDAY(complete) + 1, 1)) -
+		- (select count(*) from holiday_date where holiday between  DATE_FORMAT(receipt, '%Y%m%d') and DATE_FORMAT(complete, '%Y%m%d') ) 
+		AS DIFF_DAY from (
+		select str_to_date(p.RECEIPT_DT, '%Y%m%d%H%i') AS receipt, str_to_date(p.COMPLETE_DT, '%Y%m%d%H%i') AS complete from 
+		event e left join process p on e.req_code = p.req_code
+		where 
+		e.use_yn = 'Y'
+		and 
+		p.proc_type='EV01'
+		and p.receipt_dt between ${param.start_time} and ${param.end_time}
+		) RESULT_DATA
+		) RD
+  </select>
+
+
+
+  <select id="change4CountTime" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		/*
+		등급별 변경 건수시간
+		*/
+		select 
+			sum(if(EMERGENCY_CODE  = 'E001', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_E001</if><if test="param.type != null and param.type.equals('SW')">CS_E001</if>, 
+			sum(if(EMERGENCY_CODE  = 'E002', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_E002</if><if test="param.type != null and param.type.equals('SW')">CS_E002</if>, 
+			sum(if(EMERGENCY_CODE  = 'E003', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_E003</if><if test="param.type != null and param.type.equals('SW')">CS_E003</if>, 
+			sum(if(EMERGENCY_CODE  = 'E004', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_E004</if><if test="param.type != null and param.type.equals('SW')">CS_E004</if>, 	
+			sum(if(EMERGENCY_CODE  = 'E005', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_E005</if><if test="param.type != null and param.type.equals('SW')">CS_E005</if>,
+			sum(if(success = 'Y', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_S</if><if test="param.type != null and param.type.equals('SW')">CS_S</if>,
+			sum(if(success = 'N', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_F</if><if test="param.type != null and param.type.equals('SW')">CS_F</if>,
+			sum(if(success = 'C', cnt, 0)) AS <if test="param.type != null and param.type.equals('HW')">CH_C</if><if test="param.type != null and param.type.equals('SW')">CS_C</if>
+		 from (
+		select 
+			MAX(o.success) as SUCCESS
+			,count(1) cnt
+			, (
+			select 
+				max(division)
+			from infrastructure i
+			where 
+				concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+			) AS KIND
+		, substr(p.receipt_dt, 1, 6) AS MON
+		, e.EMERGENCY_CODE
+		from 
+			event e
+			, `change` o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE 
+			and p.receipt_dt between ${param.start_time} and ${param.end_time}
+			and e.USE_YN = 'Y' 
+		GROUP BY KIND, MON, e.EMERGENCY_CODE
+			) A
+		 where 
+			 A.KIND  like 
+			 <if test="param.type != null and param.type.equals('HW')">
+			 'H1%'
+			 </if>
+			 <if test="param.type != null and param.type.equals('SW')">
+			 'H2%'
+			 </if>
+  </select>
+  
+
+  <select id="change4KindOfUser" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		/*시설별 변경 현황 */
+		select 
+			sum(if(CODE = 'H101', cnt, 0)) AS U_H101, 
+			sum(if(CODE = 'H102', cnt, 0)) AS U_H102, 
+			sum(if(CODE = 'H103', cnt, 0)) AS U_H103, 
+			sum(if(CODE = 'H104', cnt, 0)) AS U_H104, 
+			sum(if(CODE = 'H201', cnt, 0)) AS U_H201,
+			sum(if(CODE = 'H202', cnt, 0)) AS U_H202,
+			sum(if(CODE = 'H203', cnt, 0)) AS U_H203
+		 from (
+		select 
+			count(1) cnt
+			, (
+			select 
+				max(division)
+			from infrastructure i
+			where 
+				concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+			) AS KIND
+		, substr(p.receipt_dt, 1, 6) AS MON
+		
+		from 
+			event e
+			, `change` o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE 
+			and p.receipt_dt between ${param.start_time} and ${param.end_time}
+			and e.USE_YN = 'Y' 
+		GROUP BY KIND, MON
+			) A, code c
+		where c.code_master = 'HWSW'
+		 AND c.code = A.kind
+  </select>
+     
+
+  <select id="change4KindOfOutside" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		select 
+			sum(if(A.KIND = 'H101', cnt, 0)) AS O_H101, 
+			sum(if(A.KIND = 'H102', cnt, 0)) AS O_H102, 
+			sum(if(A.KIND = 'H103', cnt, 0)) AS O_H103, 
+			sum(if(A.KIND = 'H104', cnt, 0)) AS O_H104, 
+			sum(if(A.KIND = 'H201', cnt, 0)) AS O_H201,
+			sum(if(A.KIND = 'H202', cnt, 0)) AS O_H202,
+			sum(if(A.KIND = 'H203', cnt, 0)) AS O_H203
+		 from (
+		select 
+		(select 
+				max(division)
+			from infrastructure i
+			where 
+				concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+			) AS KIND,
+		count(1) AS cnt
+		 from external_work p
+		where p.USE_YN ='Y'
+			and p.work_st between ${param.start_time} and ${param.end_time}
+		group by KIND
+		) A
+  </select>
+  
+  <select id="serviceAvailability" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  	
+	/* SERVICE AVAILABILITY */
+	SELECT 
+		SA.SA_VAL
+		, SA.SA_CLASS
+		, SA.SA_SCORE
+		, SA.SA_SCORE * 0.45 AS SA_RESULT
+	FROM (
+	SELECT 
+		TRUNCATE((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME)/B.SERVICE_PROVIDE_TIME * 100, 4) AS SA_VAL
+		, CASE TRUNCATE((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME)/B.SERVICE_PROVIDE_TIME * 100, 1)
+			WHEN 100 THEN 'S'
+			WHEN 99.9 THEN 'A'
+			WHEN 99.8 THEN 'B'
+			WHEN 99.7 THEN 'C'
+			ELSE 'D'
+		END AS SA_CLASS
+		, CASE TRUNCATE((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME)/B.SERVICE_PROVIDE_TIME * 100, 1)
+			WHEN 100 THEN '100'
+			WHEN 99.9 THEN '90'
+			WHEN 99.8 THEN '80'
+			WHEN 99.7 THEN '70'
+			ELSE '60'
+		END AS SA_SCORE
+	FROM (
+	
+		/* 중단 시간 */
+		select 
+			 SUM(CASE E.EMERGENCY_CODE 
+				WHEN 'E001' THEN o.SERVICE_OBSTACLE_TIME * 64
+				WHEN 'E002' THEN o.SERVICE_OBSTACLE_TIME * 16
+				WHEN 'E003' THEN o.SERVICE_OBSTACLE_TIME * 4
+				ELSE o.SERVICE_OBSTACLE_TIME * 1
+				END) AS SERVICE_OBSTACLE_TIME
+		from 
+			event e
+			, obstacle o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE 
+			and p.receipt_dt between ${param.start_time} and ${param.end_time}
+			and e.USE_YN = 'Y' 
+			and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+		) A, 
+	
+		(
+		/* 계획된 서비스 제공 시간 * 64 */
+		select 
+				(CONVERT(substring(LAST_DAY('20140801'), 9) USING utf8) * 24 * 60 - SUM(o.SERVICE_STOP_TIME)) * 64 AS SERVICE_PROVIDE_TIME
+			from 
+				event e
+				, `change` o
+				, process p
+			where
+				e.req_code = o.req_code
+				and e.req_code = p.REQ_CODE 
+				and p.receipt_dt between ${param.start_time} and ${param.end_time}
+				and e.USE_YN = 'Y' 
+				and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+		) B	
+	) SA
+  </select>
+  
+  <select id="systemNnetworkAvailability" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	
+/* 시스템 가동률과 네트워크 가동률 */
+select 
+	SN.SY_VAL, SN.SY_CLASS, SN.SY_SCORE, SN.SY_SCORE*0.1 AS SY_RESULT
+	, SN.NE_VAL, SN.NE_CLASS, SN.NE_SCORE, SN.NE_SCORE*0.05 AS NE_RESULT
+FROM (
+SELECT 
+	TRUNCATE((((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2 + 
+	 (((B.SERVICE_PROVIDE_TIME - C.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2, 4) AS SY_VAL
+ , CASE TRUNCATE((((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2 + 
+	 (((B.SERVICE_PROVIDE_TIME - C.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2, 1)
+		WHEN 100 THEN 'S'
+		WHEN 99.9 THEN 'A'
+		WHEN 99.8 THEN 'B'
+		WHEN 99.7 THEN 'C'
+		ELSE 'D'
+	END AS SY_CLASS
+	, CASE TRUNCATE((((B.SERVICE_PROVIDE_TIME - A.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2 + 
+	 (((B.SERVICE_PROVIDE_TIME - C.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 )/2, 1)
+		WHEN 100 THEN '100'
+		WHEN 99.9 THEN '90'
+		WHEN 99.8 THEN '80'
+		WHEN 99.7 THEN '70'
+		ELSE '60'
+	END AS SY_SCORE
+, TRUNCATE((((B.SERVICE_PROVIDE_TIME - D.SERVICE_OBSTACLE_TIME) / B.SERVICE_PROVIDE_TIME) * 100 ), 4) AS NE_VAL
+, CASE TRUNCATE((B.SERVICE_PROVIDE_TIME - D.SERVICE_OBSTACLE_TIME)/B.SERVICE_PROVIDE_TIME * 100, 1)
+		WHEN 100 THEN 'S'
+		WHEN 99.9 THEN 'A'
+		WHEN 99.8 THEN 'B'
+		WHEN 99.7 THEN 'C'
+		ELSE 'D'
+	END AS NE_CLASS
+	, CASE TRUNCATE((B.SERVICE_PROVIDE_TIME - D.SERVICE_OBSTACLE_TIME)/B.SERVICE_PROVIDE_TIME * 100, 1)
+		WHEN 100 THEN '100'
+		WHEN 99.9 THEN '90'
+		WHEN 99.8 THEN '80'
+		WHEN 99.7 THEN '70'
+		ELSE '60'
+	END AS NE_SCORE
+FROM (
+
+SELECT IFNULL(SUM(SERVICE_OBSTACLE_TIME), 0) AS SERVICE_OBSTACLE_TIME FROM (
+	select 
+		 SUM(CASE E.EMERGENCY_CODE 
+			WHEN 'E001' THEN o.SERVICE_OBSTACLE_TIME * 64
+			WHEN 'E002' THEN o.SERVICE_OBSTACLE_TIME * 16
+			WHEN 'E003' THEN o.SERVICE_OBSTACLE_TIME * 4
+			ELSE o.SERVICE_OBSTACLE_TIME * 1
+			END) AS SERVICE_OBSTACLE_TIME
+		, (
+		select 
+			max(division)
+		from infrastructure i
+		where 
+			concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+		) AS KIND
+	from 
+		event e
+		, obstacle o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE 
+		and p.receipt_dt between ${param.start_time} and ${param.end_time}
+		and e.USE_YN = 'Y' 
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+	group by KIND
+) A
+		WHERE  A.KIND = 'H101'
+) A,
+(
+/* 계획된 서비스 제공 시간  */
+select 
+		((CONVERT(substring(LAST_DAY('20140801'), 9) USING utf8) * 24 * 60 - SUM(o.SERVICE_STOP_TIME))) * 64 AS SERVICE_PROVIDE_TIME
+	from 
+		event e
+		, `change` o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE 
+		and p.receipt_dt between ${param.start_time} and ${param.end_time}
+		and e.USE_YN = 'Y' 
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+) B
+,(
+
+SELECT IFNULL(SUM(SERVICE_OBSTACLE_TIME), 0) AS SERVICE_OBSTACLE_TIME FROM (
+	select 
+		 SUM(CASE E.EMERGENCY_CODE 
+			WHEN 'E001' THEN o.SERVICE_OBSTACLE_TIME * 64
+			WHEN 'E002' THEN o.SERVICE_OBSTACLE_TIME * 16
+			WHEN 'E003' THEN o.SERVICE_OBSTACLE_TIME * 4
+			ELSE o.SERVICE_OBSTACLE_TIME * 1
+			END) AS SERVICE_OBSTACLE_TIME
+		, (
+		select 
+			max(division)
+		from infrastructure i
+		where 
+			concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+		) AS KIND
+	from 
+		event e
+		, obstacle o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE 
+		and p.receipt_dt between ${param.start_time} and ${param.end_time}
+		and e.USE_YN = 'Y' 
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+	group by KIND
+) A
+		WHERE  A.KIND = 'H103'
+) C
+,(
+
+SELECT IFNULL(SUM(SERVICE_OBSTACLE_TIME), 0) AS SERVICE_OBSTACLE_TIME FROM (
+	select 
+		 SUM(CASE E.EMERGENCY_CODE 
+			WHEN 'E001' THEN o.SERVICE_OBSTACLE_TIME * 64
+			WHEN 'E002' THEN o.SERVICE_OBSTACLE_TIME * 16
+			WHEN 'E003' THEN o.SERVICE_OBSTACLE_TIME * 4
+			ELSE o.SERVICE_OBSTACLE_TIME * 1
+			END) AS SERVICE_OBSTACLE_TIME 
+		, (
+		select 
+			max(division)
+		from infrastructure i
+		where 
+			concat('%,', p.infra_id , ',%')like concat('%,', i.ID, ',%')
+		) AS KIND
+	from 
+		event e
+		, obstacle o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE 
+		and p.receipt_dt between ${param.start_time} and ${param.end_time}
+		and e.USE_YN = 'Y' 
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+	group by KIND
+) A
+		WHERE  A.KIND = 'H104'
+) D
+) SN
+  </select>
+  
+  <select id="obstacleAverageTime" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  /* 장애처리 평균 시간 */
+	select TRUNCATE(sum(A.SERVICE_OBSTACLE_TIME ) / A.cnt, 0) AS OR_TIME, A.OR_CLASS, A.OR_SCORE, A.OR_SCORE*0.2 AS OR_RESULT from (
+		select 
+		sum(o.SERVICE_OBSTACLE_TIME ) AS SERVICE_OBSTACLE_TIME   
+		, count(1) cnt
+		, CASE 
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 60 THEN 'S'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 120 THEN 'A'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 240 THEN 'B'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 300 THEN 'C'
+			ELSE 'D'
+		END AS OR_CLASS
+		, CASE 
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 60 THEN '100'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 120 THEN '90'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 240 THEN '80'
+			WHEN TRUNCATE(sum(o.SERVICE_OBSTACLE_TIME ) / count(1), 0) &lt; 300 THEN '70'
+			ELSE '60'
+		END AS OR_SCORE
+		from 
+			event e
+			, obstacle o
+			, process p
+		where
+			e.req_code = o.req_code
+			and e.req_code = p.REQ_CODE
+			and p.receipt_dt between ${param.start_time} and ${param.end_time} 
+			and e.EMERGENCY_CODE &lt;&gt; 'E005'
+			and e.USE_YN = 'Y' 
+			and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+	) A
+  </select>
+  
+  <select id="obstacleAverageCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  /* 서비스 중단 장애 */
+select A.OS_CNT, A.OS_CLASS, A.OS_SCORE, A.OS_SCORE*0.2 AS OS_RESULT from (
+select 
+	COUNT(1) OS_CNT
+	, CASE 
+		WHEN count(1) &lt; 4 THEN 'S'
+		WHEN count(1) &lt; 6 THEN 'A'
+		WHEN count(1) &lt; 8 THEN 'B'
+		WHEN count(1) &lt; 10 THEN 'C'
+		ELSE 'D'
+	END AS OS_CLASS
+	, CASE 
+		WHEN count(1) &lt; 4 THEN '100'
+		WHEN count(1) &lt; 6 THEN '90'
+		WHEN count(1) &lt; 8 THEN '80'
+		WHEN count(1) &lt; 10 THEN '70'
+		ELSE '60'
+	END AS OS_SCORE
+	from 
+		event e
+		, obstacle o
+		, process p
+	where
+		e.req_code = o.req_code
+		and e.req_code = p.REQ_CODE
+		and p.receipt_dt between ${param.start_time} and ${param.end_time} 
+		and e.EMERGENCY_CODE &lt;&gt; 'E005'
+		and e.EMERGENCY_CODE &lt;&gt; 'E004'
+		and e.USE_YN = 'Y' 
+		and e.REQ_CODE not in (select EVENT_REQ_CODE from problem_relation)
+) A
+  </select>
+</mapper>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.monitoring.MonitoringDao">
+
+ <select id="select" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  
+		select 
+			(
+			SELECT 	
+				COUNT(1) TOTAL FROM 
+					event e
+					, process p
+				where
+					e.req_code = p.REQ_CODE 
+					and P.PROC_TYPE = 'EV00'
+					and e.USE_YN = 'Y'
+				)  AS EV00, 
+			ifnull(sum(if(P.PROC_TYPE = 'EV01', 1, 0)), 0) AS EV01, 
+			ifnull(sum(if(P.PROC_TYPE = 'EV02', 1, 0)), 0) AS EV02, 
+			ifnull(sum(if(P.PROC_TYPE = 'EV03', 1, 0)), 0) AS EV03,
+			(
+				SELECT 	
+					COUNT(1) TOTAL FROM 
+						event AS e left outer join process AS p on e.req_code = p.REQ_CODE
+					where
+						p.proc_type is null
+						and e.USE_YN = 'Y'
+			) AS TOTAL_REQUEST
+			, COUNT(1) AS TOTAL_COMPLET,
+			(
+			select	count(1) TOTAL
+			FROM 
+			`call` c
+			WHERE c.use_yn = 'Y'
+			and 
+			c.REGISTER_DT between #{param.today} and #{param.tomorrow}
+			) AS TOTAL_CALL
+		 from 	
+				event AS e left outer join process AS p on e.req_code = p.REQ_CODE  
+			where
+				p.COMPLETE_DT  between #{param.today} and #{param.tomorrow}
+				and e.USE_YN = 'Y' 
+  </select>
+  
+</mapper>

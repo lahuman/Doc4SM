@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.code.CodeDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	c.code
+    	, c.code_master
+    	, m.name AS code_master_name
+    	, c.name
+    	, c.register_dt
+    	, c.modify_dt
+    from code c, code_master m
+    where c.code_master = m.code_master
+    <if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.code_master)' >
+    	AND c.code_master = #{param.code_master}
+    </if>
+    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+    <include refid="Core.limit"/>
+  </select>
+  
+    <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+    select 
+    	count(*)
+    from code c, code_master m
+    where c.code_master = m.code_master
+    <if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.code_master)' >
+    	AND c.code_master = #{param.code_master}
+    </if>
+  </select>
+    <select id="codeList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	    select 
+	    	c.code
+	    	, c.code_master
+	    	, m.name AS code_master_name
+	    	, c.name
+	    	, c.register_dt
+	    	, c.modify_dt
+	    from code c, code_master m
+	    where c.code_master = m.code_master
+	    	AND c.code_master = #{param.code_master}
+  </select>
+
+ 
+   <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+   	INSERT INTO code
+		(`CODE`,
+		`CODE_MASTER`,
+		`NAME`,
+		`REGISTER_DT`,
+		`REGISTER_ID`
+		)
+		VALUES
+		(
+		#{param.code}
+		, #{param.code_master}
+		, #{param.name}
+		, <include refid="Core.nowDt"/>
+		, #{param.getLogin4UserId} 
+		)
+	ON DUPLICATE KEY
+	UPDATE 
+		`CODE_MASTER` = #{param.code_master},
+		`NAME` = #{param.name},
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId} 
+  </insert>
+
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM code
+	WHERE 
+			`CODE_MASTER` = #{param.code_master}
+			<if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.code)' >
+				AND `CODE` = #{param.code}
+			</if>
+  </delete>
+</mapper>

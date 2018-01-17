@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.infra.InfraDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	`ID`,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='HWSW' AND  C.CODE = `DIVISION`) AS DIVISION,
+		(SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='EMGC' AND  C.CODE = `EMERGENCY_TYPE`) AS EMERGENCY_TYPE,
+	   `OWN_GROUP`,
+	   `OFFER_USER`,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='SVST' AND  C.CODE = `SERVICE_STATUS`) AS SERVICE_STATUS,
+	   `USE_TITLE`,
+	   (SELECT U.NAME FROM user U WHERE U.USER_ID =  `MARK_ID`) MARK_NAME,
+	   `MODEL_NAME`,
+	   `REGISTER_DT`,
+	   `MODIFY_DT`
+	FROM `infrastructure`
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.division)">
+			DIVISION = #{param.division}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.use_title)">
+			USE_TITLE LIKE CONCAT('%', #{param.use_title},'%')
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM `infrastructure`
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.division)">
+			DIVISION = #{param.division}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.use_title)">
+			USE_TITLE LIKE CONCAT('%', #{param.use_title},'%')
+		</if>
+	</where>
+	
+  </select>
+  
+  <select id="select" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  SELECT 
+	  	`ID`,
+	   `DIVISION`,
+	   `RESOURCE_NUM`,
+	   `EMERGENCY_TYPE`,
+	   `INSTALL_DT`,
+	   `OWN_GROUP`,
+	   `OFFER_USER`,
+	   `SERVICE_STATUS`,
+	   `USE_TITLE`,
+	   `MARK_ID`,
+	   `LICENSE`,
+	   `LICENSE_COUNT`,
+	   `ADJUNCTION`,
+	   `COMPANY_ID`,
+	   `MODEL_NAME`,	
+	   `SERIAL_NO`,
+	   `HOST_NAME`,
+	   `IP_ADDRESS`,
+	   `REAL_LOCATION`,
+	   `CPU`,
+	   `MEMORY`,
+	   `OS`,
+	   `INSIDE_DISK`,
+	   `OUTSIDE_DISK`,
+	   `REGISTER_DT`,
+	   `MODIFY_DT`
+	FROM `infrastructure`
+ 	WHERE ID = #{param.id}
+  </select>
+  <select id="connectInfraList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	   SELECT 
+	   I.`ID`,
+	   if(J.JOIN_ID is not null, 1,0) JOIN_ID,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='HWSW' AND  C.CODE = I.`DIVISION`) AS DIVISION,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='EMGC' AND  C.CODE = I.`EMERGENCY_TYPE`) AS EMERGENCY_TYPE,
+	   I.`OWN_GROUP`,
+	   I.`OFFER_USER`,
+	   (SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='SVST' AND  C.CODE = I.`SERVICE_STATUS`) AS SERVICE_STATUS,
+	   I.`USE_TITLE`,
+	   (SELECT U.NAME FROM user U WHERE U.USER_ID =  I.`MARK_ID`) MARK_NAME,
+	   I.`MODEL_NAME`,
+	   I.`REGISTER_DT`,
+	   I.`MODIFY_DT`
+		FROM `infrastructure` I left outer join infra_join J on I.id = J.JOIN_ID AND J.INFRA_ID =#{param.id}
+	 	WHERE  I.`ID` &lt;&gt; #{param.id}
+  </select>
+  <select id="comboInfraList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  	SELECT
+  		I.ID,
+  		CONCAT((SELECT C.NAME FROM CODE C WHERE C.CODE_MASTER='HWSW' AND  C.CODE = I.`DIVISION`), '-', I.USE_TITLE) AS USE_TITLE
+  	FROM
+  		infrastructure I
+  	ORDER BY ID
+  </select>
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO infrastructure
+			(
+				`DIVISION`,
+			   `RESOURCE_NUM`,
+			   `EMERGENCY_TYPE`,
+			   `INSTALL_DT`,
+			   `OFFER_USER`,
+			   `SERVICE_STATUS`,
+			   `USE_TITLE`,
+			   `MARK_ID`,
+			   `LICENSE`,
+			   `LICENSE_COUNT`,
+			   `ADJUNCTION`,
+			   `COMPANY_ID`,
+			   `MODEL_NAME`,
+			   `SERIAL_NO`,
+			   `HOST_NAME`,
+			   `IP_ADDRESS`,
+			   `REAL_LOCATION`,
+			   `CPU`,
+			   `MEMORY`,
+			   `INSIDE_DISK`,
+			   `OUTSIDE_DISK`,
+			   `OWN_GROUP`,
+			   `OS`,
+			   REGISTER_DT,
+			   REGISTER_ID
+				)VALUES(
+				#{param.division},
+				#{param.resource_num},
+				#{param.emergency_type},
+				#{param.install_dt},
+				#{param.offer_user},
+				#{param.service_status},
+				#{param.use_title},
+				#{param.MARK_ID},
+				#{param.license},
+				#{param.license_count},
+				#{param.adjunction},
+				#{param.company_id},
+				#{param.model_name},
+				#{param.serial_no},
+				#{param.host_name},
+				#{param.ip_address},
+				#{param.real_location},
+				#{param.cpu},
+				#{param.memory},
+				#{param.inside_disk},
+				#{param.outside_disk},
+				#{param.own_group},
+				#{param.os},
+				<include refid="Core.nowDt"/>		
+				, #{param.getLogin4UserId}
+			)
+			
+	  	</when>
+	  	<otherwise>
+	  		UPDATE infrastructure
+				SET
+				DIVISION = #{param.DIVISION},
+				RESOURCE_NUM =#{param.RESOURCE_NUM},
+				EMERGENCY_TYPE=#{param.EMERGENCY_TYPE},
+				INSTALL_DT=#{param.INSTALL_DT},
+				OWN_GROUP=#{param.OWN_GROUP},
+				OFFER_USER=#{param.OFFER_USER},
+				SERVICE_STATUS=#{param.SERVICE_STATUS},
+				USE_TITLE=#{param.USE_TITLE},
+				MARK_ID=#{param.MARK_ID},
+				LICENSE=#{param.LICENSE},
+				LICENSE_COUNT=#{param.LICENSE_COUNT},
+				ADJUNCTION=#{param.ADJUNCTION},
+				COMPANY_ID=#{param.COMPANY_ID},
+				MODEL_NAME=#{param.MODEL_NAME},
+				SERIAL_NO=#{param.SERIAL_NO},
+				HOST_NAME=#{param.HOST_NAME},
+				IP_ADDRESS=#{param.IP_ADDRESS},
+				REAL_LOCATION=#{param.REAL_LOCATION},
+				CPU=#{param.CPU},
+				MEMORY=#{param.MEMORY},
+				INSIDE_DISK=#{param.INSIDE_DISK},
+				OUTSIDE_DISK=#{param.OUTSIDE_DISK},
+				OWN_GROUP=#{param.OWN_GROUP},
+				OS=#{param.OS},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <update id="updateManager" parameterType="kr.pe.lahuman.utils.DataMap" >
+  UPDATE infrastructure
+				SET
+				OWN_GROUP=#{param.OWN_GROUP},
+				OFFER_USER=#{param.OFFER_USER},
+				USE_TITLE=#{param.USE_TITLE},
+				MARK_ID=#{param.MARK_NAME},
+				MODEL_NAME=#{param.MODEL_NAME},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+  </update>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE infrastructure SET
+  		`USE_YN` = 'N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+  	where id=#{param.id}
+  </delete>
+  
+  <delete id="connectInfraDelete" parameterType="String">
+  	DELETE from infra_join 
+  	where infra_id =#{id} 
+  </delete>
+  
+  <insert id="insertConnectInfra" parameterType="java.util.List">
+  	INSERT INTO infra_join(
+  		INFRA_ID
+  		, JOIN_ID
+  		, REGISTER_DT
+  	) values
+  	<foreach collection="list" item="item" index="index"  separator="," >
+	  	 (#{item.INFRA_ID}, #{item.JOIN_ID}, <include refid="Core.nowDt"/>)
+  	</foreach>
+  </insert>
+</mapper>

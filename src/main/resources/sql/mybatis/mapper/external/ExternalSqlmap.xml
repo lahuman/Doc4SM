@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.external.ExternalDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	e.ID,
+    	e.WORK_CODE,
+    	e.COMPANY_ID,
+    	e.WORK_NAME,
+    	e.WORKER,
+    	e.USER,
+    	e.MANAGER_ID,
+    	e.WORK_ST,
+    	e.WORK_ET,
+    	e.SUCCESS,
+    	e.INFRA_ID,
+    	e.REGISTER_DT
+    	,mr.milestone_id
+	FROM external_work e
+		left join milestone_relation mr on mr.event_type = 'O' and event_code = e.id
+	<where>
+		e.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.work_name)">
+			AND e.WORK_NAME LIKE CONCAT('%', #{param.work_name}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.company_id)">
+			AND e.COMPANY_ID = #{param.company_id}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(e.WORK_ST, 4) = #{param.year}
+		</if>
+	</where>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY e.${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			e.${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+	ORDER BY e.WORK_ST DESC
+	</if>
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT 
+     	count(*)
+	FROM external_work e
+		left join milestone_relation mr on mr.event_type = 'O' and event_code = e.id
+	<where>
+		e.USE_YN='Y'
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.work_name)">
+			AND e.WORK_NAME LIKE CONCAT('%', #{param.work_name}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.company_id)">
+			AND e.COMPANY_ID = #{param.company_id}
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(e.WORK_ST, 4) = #{param.year}
+		</if>
+	</where>
+	
+  </select>
+  
+  <!-- ID를 작업 시작일의 YYYY-MMDD-SEQ 로 수정한다. -->
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+  	<choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+		  	INSERT INTO external_work
+			(
+			ID,
+			WORK_CODE,
+	    	COMPANY_ID,
+	    	WORK_NAME,
+	    	WORKER,
+	    	USER,
+	    	MANAGER_ID,
+	    	WORK_ST,
+	    	WORK_ET,
+	    	SUCCESS,
+	    	INFRA_ID,
+	    	REGISTER_DT,
+	    	REGISTER_ID
+			)
+			SELECT 
+			CONCAT(SUBSTR( #{param.work_st}, 1, 4) , '-', SUBSTR( #{param.work_st}, 5, 4), '-', LPAD(count(1)+1, 3,0))
+			, #{param.work_code}
+			, #{param.company_id}
+			, #{param.work_name}
+			, #{param.worker}
+			, #{param.user}
+			, #{param.manager_id}
+			, #{param.work_st}
+			, #{param.work_et}
+			, #{param.success}
+			, #{param.infra_id}
+			, <include refid="Core.nowDt"/>
+			,#{param.getLogin4UserId}
+			FROM external_work
+			WHERE SUBSTR(ID, 1, 10) = CONCAT(SUBSTR( #{param.work_st}, 1, 4) , '-', SUBSTR( #{param.work_st}, 5, 4), '-')
+	  	</when>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.id)">
+	  		UPDATE external_work SET
+				WORK_CODE = #{param.work_code},
+		    	COMPANY_ID = #{param.company_id},
+		    	WORK_NAME = #{param.work_name},
+		    	WORKER = #{param.worker},
+		    	USER = #{param.user},
+		    	MANAGER_ID = #{param.manager_id},
+		    	WORK_ST = #{param.work_st},
+		    	WORK_ET = #{param.work_et},
+		    	SUCCESS = #{param.success},
+		    	INFRA_ID = #{param.infra_id},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+			WHERE ID = #{param.id}
+	  	</when>
+	</choose>
+  </insert>
+  
+  <update id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	UPDATE external_work SET
+  		USE_YN='N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+	WHERE ID = #{param.id}
+  </update>
+</mapper>

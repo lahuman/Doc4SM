@@ -1,0 +1,35 @@
+<mockup version="1.0" skin="sketch" fontFace="Balsamiq Sans" measuredW="976" measuredH="615" mockupW="800" mockupH="600">
+  <controls>
+    <control controlID="0" controlTypeID="com.balsamiq.mockups::BrowserWindow" x="176" y="15" w="800" h="600" measuredW="450" measuredH="400" zOrder="0" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>A%20Web%20Page%0Ahttp%3A//itsm.lahuman.pe.kr</text>
+      </controlProperties>
+    </control>
+    <control controlID="9" controlTypeID="com.balsamiq.mockups::DataGrid" x="239" y="217" w="-1" h="-1" measuredW="497" measuredH="171" zOrder="1" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC5C5%uCCB4%uBA85%2C%20%uB300%uD45C%20%uC5F0%uB77D%uCC98%2C%20%uB2F4%uB2F9%uC790%2C%20%uCD5C%uC885%uACC4%uC57D%uC2DC%uC791%uC77C%2C%20%uCD5C%uC885%uACC4%uC57D%uC885%uB8CC%uC77C%2C%20%uB4F1%uB85D%uC77C%0AANACOM%2C%2002-2038-3377%2C%20%uC784%uAD11%uADDC%2C%202014-01-01%2C%202014-12-31%2C%202014-03-08%0AANACOM%2C%2002-2038-3377%2C%20%uC784%uAD11%uADDC%2C%202014-01-01%2C%202014-12-31%2C%202014-03-08%0AANACOM%2C%2002-2038-3377%2C%20%uC784%uAD11%uADDC%2C%202014-01-01%2C%202014-12-31%2C%202014-03-08%0AANACOM%2C%2002-2038-3377%2C%20%uC784%uAD11%uADDC%2C%202014-01-01%2C%202014-12-31%2C%202014-03-08%0AANACOM%2C%2002-2038-3377%2C%20%uC784%uAD11%uADDC%2C%202014-01-01%2C%202014-12-31%2C%202014-03-08</text>
+      </controlProperties>
+    </control>
+    <control controlID="11" controlTypeID="com.balsamiq.mockups::Label" x="220" y="134" w="-1" h="-1" measuredW="68" measuredH="21" zOrder="2" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC5C5%uCCB4%20%3A%3A%20%uBAA9%uB85D</text>
+      </controlProperties>
+    </control>
+    <control controlID="12" controlTypeID="com.balsamiq.mockups::Button" x="688" y="411" w="-1" h="-1" measuredW="48" measuredH="27" zOrder="3" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uB4F1%uB85D</text>
+      </controlProperties>
+    </control>
+    <control controlID="14" controlTypeID="com.balsamiq.mockups::ComboBox" x="247" y="174" w="-1" h="-1" measuredW="69" measuredH="46" zOrder="4" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC5C5%uCCB4%uBA85%0A%uB2F4%uB2F9%uC790</text>
+      </controlProperties>
+    </control>
+    <control controlID="15" controlTypeID="com.balsamiq.mockups::Button" x="673" y="174" w="-1" h="-1" measuredW="48" measuredH="27" zOrder="5" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uAC80%uC0C9</text>
+      </controlProperties>
+    </control>
+    <control controlID="16" controlTypeID="com.balsamiq.mockups::TextInput" x="350" y="174" w="245" h="-1" measuredW="79" measuredH="26" zOrder="6" locked="false" isInGroup="-1"/>
+  </controls>
+</mockup>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.svn.VersionDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT * 
+		FROM (
+				SELECT 
+		     	V.KIND_CD,
+		    	V.ID,
+		    	V.SVN_VERSION,
+		    	V.VERSION,
+		    	V.AUTHOR,
+		    	V.REGISTER_DT,
+		    	V.MODIFY_DT,
+		    	CASE WHEN V.KIND_CD = 'I' THEN(
+		    	 
+				select group_concat( I.USE_TITLE) from infrastructure I
+					where ( select concat(',',P.infra_id, ',') from process P where P.req_code=V.id ) like concat('%,',I.id,',%')
+				)
+				ELSE(
+				select group_concat( I.USE_TITLE) from infrastructure I
+					where 
+					( select concat(',',E.infra_id, ',') from external_work E where E.id=V.id ) like concat('%,',I.id,',%')
+				)
+				END
+				AS USE_TITLE
+			FROM `version_info` V
+ 		) subq	
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.use_title)">
+			AND USE_TITLE like concat('%',#{param.use_title}, '%')
+		</if>
+	</where>
+	ORDER BY svn_version DESC
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+		SELECT 
+		     	count(*)
+			FROM `version_info` V
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.use_title)">
+			AND USE_TITLE like concat('%',#{param.use_title}, '%')
+		</if>
+	</where>
+  </select>
+  
+  <select id="getLastSVNVersion" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Long">
+     SELECT 
+     	ifnull(max(SVN_VERSION),0)+1
+	FROM `version_info`
+  </select>
+  
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  	INSERT INTO `version_info`
+		(`KIND_CD`,
+		`ID`,
+		`SVN_VERSION`,
+		`VERSION`,
+		`AUTHOR`,
+		`REGISTER_DT`,
+		`REGISTER_ID`
+		)
+		VALUES
+		(
+		#{param.kind_cd}
+		, #{param.id}
+		, #{param.svn_version}
+		, #{param.version}
+		, #{param.author}
+		, <include refid="Core.nowDt"/>
+		, #{param.getLogin4UserId}
+		)
+	ON DUPLICATE KEY
+	UPDATE 
+		`KIND_CD` = #{param.kind_cd},
+		`VERSION` = #{param.version},
+		`AUTHOR` =  #{param.author},
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	DELETE FROM  `version_info`
+  	where id=#{param.id}
+  	and svn_version=#{param.svn_version}
+  </delete>
+</mapper>

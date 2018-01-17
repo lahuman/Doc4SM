@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.user.UserDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	USER_ID,
+    	LOGIN_ID,
+    	NAME,
+    	POSITION,
+    	CONVERT(ENABLED using utf8)AS USE_YN,
+    	TEL,
+    	EMAIL,
+    	COMPANY_ID,
+    	CHARGE_WORK,
+    	REGISTER_DT,
+    	MODIFY_DT
+	FROM user
+	order by ENABLED DESC, REGISTER_DT DESC 
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM user
+  </select>
+  
+  <select id="userList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+	  SELECT 
+	     	concat(USER_ID, '') as USER_ID,
+	    	NAME
+	FROM user
+	WHERE ENABLED='1'
+  </select>
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.user_id)">
+	  		INSERT INTO user
+			(
+			`LOGIN_ID`,
+			`PASSWORD`,
+			`NAME`,
+			`POSITION`,
+			`ENABLED`,
+			`TEL`,
+			`EMAIL`,
+			COMPANY_ID,
+    		CHARGE_WORK,
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			VALUES
+			(
+			#{param.login_id},
+			#{param.password},
+			#{param.name},
+			#{param.position},
+			#{param.use_yn},
+			#{param.tel},
+			#{param.email},
+			#{param.company_id},
+			#{param.charge_work},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			)	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE user
+				SET
+				`PASSWORD` = #{param.password},
+				`NAME` = #{param.name},
+				`POSITION` = #{param.position},
+				`ENABLED` = #{param.use_yn},
+				`TEL` = #{param.tel},
+				`EMAIL` = #{param.email},
+				`COMPANY_ID` = #{param.COMPANY_ID},
+				`CHARGE_WORK` = #{param.CHARGE_WORK},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `USER_ID` = #{param.user_id} AND LOGIN_ID=#{param.login_id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM user
+	WHERE `USER_ID` = #{param.user_id} AND LOGIN_ID=#{param.login_id}
+  </delete>
+  
+  <select id="roleList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select
+        r.ROLE_ID,
+        r.NAME,
+        r.DESCRIPTION,
+        ur.USER_ID 
+    from
+        role r 
+    left join
+        user_role ur 
+            on r.role_id = ur.ROLE_ID 
+            and user_id=#{param.user_id}
+  </select>
+  <insert id="insertRole" parameterType="java.util.List">
+  	INSERT INTO user_role(
+  		role_id
+  		, user_id
+  	) values
+  	<foreach collection="list" item="param" index="index" separator=",">
+	  	( #{param.role_id}, #{param.user_id})
+  	</foreach>
+  </insert>
+  <delete id="deleteRole" parameterType="kr.pe.lahuman.utils.DataMap">
+  	DELETE FROM user_role
+  	where user_id=#{param.user_id}
+  </delete>
+  
+  <select id="getName"  parameterType="java.lang.String" resultType="kr.pe.lahuman.utils.DataMap">
+  	SELECT USER_ID, NAME, TEL FROM USER
+  	WHERE ENABLED='1' AND LOGIN_ID = #{param}
+  </select>
+</mapper>

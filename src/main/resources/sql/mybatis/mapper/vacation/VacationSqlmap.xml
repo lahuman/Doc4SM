@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.vacation.VacationDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	id
+    	, vacation_user
+    	, agent_user
+    	, (SELECT 5 * (DATEDIFF(END_DT, START_DT  ) DIV 7) + MID('0123444401233334012222340111123400012345001234550',
+    	 	7 * WEEKDAY(START_DT ) + WEEKDAY(END_DT) + 1, 1) + 1
+    	 	- (SELECT COUNT(1) FROM HOLIDAY_DATE WHERE HOLIDAY &gt;= START_DT   AND HOLIDAY &lt;= END_DT)) 
+    	 as VACATION_DT
+    	, start_dt
+    	, end_dt
+    	, vacation_kind
+    	, detail
+    	, register_dt
+    	, modify_dt 
+    from vacation
+    <where>
+    	use_yn='Y'
+	    <if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.vacation_user)' >
+	    	AND vacation_user = #{param.vacation_user}
+	    </if>
+	    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(START_DT, 4) = #{param.year}
+		</if>
+    </where>
+    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.sort)">
+		ORDER BY START_DT DESC
+	</if>
+    <include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+    select count(*) 
+    from vacation
+    <where>
+    	use_yn='Y'
+	    <if test='@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.vacation_user)' >
+	    	AND vacation_user = #{param.vacation_user}
+	    </if>
+	    <if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(START_DT, 4) = #{param.year}
+		</if>
+    </where>
+  </select>
+
+
+  <select id="holidayList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select SQL_CALC_FOUND_ROWS
+    	holiday
+    	, date_name
+    	, register_id
+    	, register_dt
+    	, modify_dt 
+    	, modify_id
+    from holiday_date
+    ORDER BY holiday DESC
+    <include refid="Core.limit"/>
+  </select>
+  
+   <select id="holidayListCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+    select count(*)
+    from holiday_date
+  </select>
+ 
+   <insert id="holidayMarge" parameterType="kr.pe.lahuman.utils.DataMap">
+   	INSERT INTO `holiday_date` (
+   		HOLIDAY
+   		, DATE_NAME
+   		, REGISTER_DT
+   		, REGISTER_ID
+   		)VALUES(
+   			#{param.holiday}
+   			, #{param.date_name}
+   			, <include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+   		)ON DUPLICATE KEY UPDATE
+   		HOLIDAY =   #{param.holiday}
+   		, DATE_NAME = #{param.date_name}
+   		, MODIFY_DT =<include refid="Core.nowDt"/> 
+   		, MODIFY_ID =#{param.getLogin4UserId} 
+   </insert>
+ 
+   <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+   	<choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO `vacation`
+			(
+			`VACATION_USER`,
+			`AGENT_USER`,
+			`START_DT`,
+			`END_DT`,
+	    	`VACATION_KIND`,
+	    	`DETAIL`,
+			`REGISTER_DT`,
+			`REGISTER_ID`
+			)
+			VALUES
+			(
+			#{param.vacation_user},
+			#{param.agent_user},
+			#{param.start_dt},
+			#{param.end_dt},
+			#{param.vacation_kind},
+			#{param.detail},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			)
+	  	</when>
+	  	<otherwise>
+	  		UPDATE `vacation`
+				SET
+				`VACATION_USER` = #{param.VACATION_USER},
+				`AGENT_USER` = #{param.AGENT_USER},
+				`VACATION_KIND` = #{param.VACATION_KIND},
+				`START_DT` = #{param.start_dt},
+				`END_DT` = #{param.end_dt},
+				`DETAIL` = #{param.detail},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId} 
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+
+  <update id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	UPDATE VACATION SET USE_YN='N', 
+  				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+	WHERE 
+		`ID` = #{param.id}
+  </update>
+  
+  <delete id="holidayDelete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM holiday_date
+  	WHERE holiday = #{param.holiday}
+  </delete>
+</mapper>

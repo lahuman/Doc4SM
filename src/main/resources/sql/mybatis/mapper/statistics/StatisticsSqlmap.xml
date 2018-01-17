@@ -1,0 +1,410 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.statistics.StatisticsDao">
+  <select id="event" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  SELECT 
+	A.DT
+	, SUM(A.CALL_CNT) AS CALL_CNT
+	, SUM(A.CNT) AS CNT
+	, SUM(A.EV01) AS EV01
+	, SUM(A.EV02) AS EV02
+	, SUM(A.EV03) AS EV03 
+FROM (
+    select 
+	  	left(COMPLETE_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			)  AS DT
+		, 0 as CALL_CNT 
+	  	, count(1) AS CNT 
+	  	, SUM( if(proc_type = 'EV01', 1, 0)) AS EV01 
+	  	, SUM( if(proc_type = 'EV02', 1, 0)) AS EV02
+	  	, SUM( if(proc_type = 'EV03', 1, 0)) AS EV03   
+	  from `process`
+	<where>
+		COMPLETE_DT IS NOT NULL
+		AND 
+		left(RECEIPT_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			) between #{param.start_dt} and #{param.end_dt}
+		 OR left(COMPLETE_DT,
+		  <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+		) between #{param.start_dt} and #{param.end_dt}			
+	</where>
+	  group by left(COMPLETE_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			)
+UNION
+ 	select 
+	  	left(END_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			)  AS DT
+	  	, count(1) AS CNT
+	  	, 0 as CNT
+		, 0 EV01
+		, 0 EV02
+		, 0 EV03 
+	  from `call`
+	<where>
+		left(START_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			) between #{param.start_dt} and #{param.end_dt}
+		OR
+		left(END_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			) between #{param.start_dt} and #{param.end_dt}
+	</where>
+	  group by left(END_DT,
+		 <choose>
+			 <when test="param.type == 'Y'.toString()">4</when>
+			 <when test="param.type.equals('YM')">6</when>
+			 <when test="param.type.equals('YMD')">8</when>
+         </choose>
+			)
+			) A
+GROUP BY A.DT
+  </select>
+
+  <select id="service" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  
+    select
+        NAME  AS DT,
+        sum(ifnull(CNT, 0)) AS CNT  ,
+        sum(ifnull(CALL_CNT,0))  AS CALL_CNT  ,
+        sum(EV01) AS EV01  ,
+        sum(EV02 ) AS EV02  ,
+        sum(EV03 ) AS EV03 
+    from
+        ( SELECT
+            S.NAME  ,
+            C.CNT AS CNT  ,
+            CALL_CNT   ,
+            EV01   ,
+            EV02   ,
+            EV03   
+        FROM
+            SERVICE S 
+        LEFT Join
+            (
+                SELECT
+                    C.SERVICE_ID  ,
+                    count(CA.REQ_CODE) CNT  ,
+                    0 CALL_CNT  ,
+                    SUM( if(CA.proc_type = 'EV01',
+                    1,
+                    0)) AS EV01   ,
+                    SUM( if(CA.proc_type = 'EV02',
+                    1,
+                    0)) AS EV02  ,
+                    SUM( if(CA.proc_type = 'EV03',
+                    1,
+                    0)) AS EV03    
+                FROM
+                    category C  
+                INNER JOIN
+                    (
+                        SELECT
+                            e.req_code,
+                            P.proc_type,
+                            e.use_yn,
+                            e.category_id,
+                            p.RECEIPT_DT,
+                            p.COMPLETE_DT 
+                        from
+                            `event` e,
+                            `process` p 
+                        where
+                            e.req_code = p.req_code
+                    ) CA 
+                        on CA.use_YN='Y' 
+                        AND C.ID = CA.category_id  
+                <where>
+                left(CA.RECEIPT_DT,    8    )  between #{param.start_dt} and #{param.end_dt}     
+                OR left(CA.COMPLETE_DT,     8   )  between #{param.start_dt} and #{param.end_dt}  
+                </where>
+                group by C.SERVICE_ID ) C 
+                        ON S.ID = C.SERVICE_ID 
+                union
+                SELECT
+                    S.NAME  ,
+                    C.CNT CNT  ,
+                    C.CNT AS CALL_CNT  ,
+                    0 EV01  ,
+                    0 EV02  ,
+                    0 EV03   
+                FROM
+                    SERVICE S 
+                LEFT Join
+                    (
+                        SELECT
+                            C.SERVICE_ID  ,
+                            count(CA.ID) CNT 
+                        FROM
+                            category C   
+                        INNER JOIN
+                            `call` CA 
+                                on CA.use_YN='Y' 
+                                AND C.ID = CA.category_id   
+                        <where>
+                        left(CA.START_DT,    8    )  between #{param.start_dt} and #{param.end_dt}    
+                        OR   left(CA.END_DT,    8    )  between #{param.start_dt} and #{param.end_dt}
+                        </where>
+                          group by C.SERVICE_ID 
+                    ) C 
+                        ON S.ID = C.SERVICE_ID 
+                    ) A 
+            WHERE CNT > 0
+            group by
+                name 
+            order by name
+  </select>
+  
+   <select id="tagCloudService" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  
+    select
+        NAME  ,
+        ID,
+        sum(ifnull(CNT, 0)) AS CNT  ,
+        sum(CALL_CNT) AS CALL_CNT ,
+        sum(EV01) AS EV01  ,
+        sum(EV02 ) AS EV02  ,
+        sum(EV03 ) AS EV03 
+    from
+        ( SELECT
+            S.NAME  ,
+            S.ID,
+            C.CNT AS CNT,
+            CALL_CNT   ,
+            EV01   ,
+            EV02   ,
+            EV03     
+        FROM
+            SERVICE S 
+        LEFT Join
+            (
+                SELECT
+                    C.SERVICE_ID  ,
+                    count(CA.REQ_CODE) CNT  ,
+                    0 CALL_CNT  ,
+                    SUM( if(CA.proc_type = 'EV01',
+                    1,
+                    0)) AS EV01   ,
+                    SUM( if(CA.proc_type = 'EV02',
+                    1,
+                    0)) AS EV02  ,
+                    SUM( if(CA.proc_type = 'EV03',
+                    1,
+                    0)) AS EV03    
+                FROM
+                    category C  
+                INNER JOIN
+                    (
+                        SELECT
+                            e.req_code,
+                            P.proc_type,
+                            e.use_yn,
+                            e.category_id,
+                            p.RECEIPT_DT,
+                            p.COMPLETE_DT 
+                        from
+                            `event` e,
+                            `process` p 
+                        where
+                            e.req_code = p.req_code and e.use_yn='Y'
+                    ) CA 
+                        on CA.use_YN='Y' 
+                        AND C.ID = CA.category_id  
+                <where>
+                left(CA.RECEIPT_DT,    8    )  between #{param.start_dt} and #{param.end_dt}     
+                OR left(CA.COMPLETE_DT,     8   )  between #{param.start_dt} and #{param.end_dt}  
+                </where>
+                group by C.SERVICE_ID ) C 
+                        ON S.ID = C.SERVICE_ID 
+                union
+                SELECT
+                    S.NAME  ,
+                    S.ID,
+                    C.CNT CNT  ,
+                    C.CNT AS CALL_CNT  ,
+                    0 EV01  ,
+                    0 EV02  ,
+                    0 EV03   
+                FROM
+                    SERVICE S 
+                LEFT Join
+                    (
+                        SELECT
+                            C.SERVICE_ID  ,
+                            count(CA.ID) CNT 
+                        FROM
+                            category C   
+                        INNER JOIN
+                            `call` CA 
+                                on CA.use_YN='Y' 
+                                AND C.ID = CA.category_id 
+                        <where>
+                        left(CA.START_DT,    8    )  between #{param.start_dt} and #{param.end_dt}    
+                        OR   left(CA.END_DT,    8    )  between #{param.start_dt} and #{param.end_dt}
+                        </where>
+                          group by C.SERVICE_ID 
+                    ) C 
+                        ON S.ID = C.SERVICE_ID 
+                    ) A 
+            group by
+                name 
+            order by CNT DESC
+  </select>
+  
+  <select id="tagCloudCategory" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  
+ select
+        C.NAME  ,
+        sum(ifnull(C.CNT, 0)) AS CNT  ,
+        sum(C.CALL_CNT) AS CALL_CNT ,
+        sum(C.EV01) AS EV01  ,
+        sum(C.EV02 ) AS EV02  ,
+        sum(C.EV03 ) AS EV03 
+    from
+        ( 
+                SELECT
+                    C.NAME  ,
+                    count(EP.REQ_CODE) CNT  ,
+                    0 CALL_CNT  ,
+                    SUM( if(EP.proc_type = 'EV01',
+                    1,
+                    0)) AS EV01   ,
+                    SUM( if(EP.proc_type = 'EV02',
+                    1,
+                    0)) AS EV02  ,
+                    SUM( if(EP.proc_type = 'EV03',
+                    1,
+                    0)) AS EV03    
+                FROM
+                    category C  
+                INNER JOIN
+                    (
+                        SELECT
+                            e.req_code,
+                            P.proc_type,
+                            e.use_yn,
+                            e.category_id,
+                            p.RECEIPT_DT,
+                            p.COMPLETE_DT 
+                        from
+                            `event` e,
+                            `process` p 
+                        where
+                            e.req_code = p.req_code and e.use_yn='Y'
+                    ) EP 
+                        on EP.use_YN='Y' 
+                        AND C.ID = EP.category_id  
+						AND C.SERVICE_ID=#{param.service_id}
+						<where>
+		                left(EP.RECEIPT_DT,    8    )  between #{param.start_dt} and #{param.end_dt}     
+		                OR left(EP.COMPLETE_DT,     8   )  between #{param.start_dt} and #{param.end_dt}
+		                </where>  
+                group by C.ID 
+                union
+                        SELECT
+                            CY.name,
+                            count(CA.ID) CNT ,
+							count(CA.ID) CALL_CNT ,
+                    0 EV01  ,
+                    0 EV02  ,
+                    0 EV03   
+                        FROM
+                            category CY   
+                        INNER JOIN
+                            `call` CA 
+                                on CA.use_YN='Y' 
+                                AND CY.ID = CA.category_id 
+								AND CY.SERVICE_ID=#{param.service_id}
+								<where>
+								left(CA.START_DT,    8    )  between #{param.start_dt} and #{param.end_dt}    
+                       			 OR   left(CA.END_DT,    8    )  between #{param.start_dt} and #{param.end_dt}
+                       			</where>
+                          group by CY.ID 
+             )      C 
+            group by
+                name 
+            order by CNT DESC
+  </select>
+  
+  
+   <select id="ganttChart" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+  
+		SELECT @RNUM := @RNUM + 1 AS ROWNUM, t.*
+		FROM (
+			select 
+				concat('[',e.req_code,']', REPLACE(REPLACE(REPLACE(e.REQ_TITLE, '\r', ''), '\n', ''), '\'', '＇')) TITLE
+				, case p.proc_type 
+					when 'EV01' then 'ffff00' 
+					when 'EV02' then '00ff00' 
+					when 'EV03' then 'ff0000' 
+					end
+				AS PROC_TYPE
+				, (SELECT U.NAME FROM user U WHERE U.USER_ID =  p.proc_user) PROC_USER
+				, (select group_concat(I.use_title) from infrastructure I where concat(',',p.INFRA_ID,',') like concat('%,',I.id,',%')) AS target
+				, concat(mid(e.req_dt,    5, 2 ),'/', mid(e.req_dt,    7, 2 ),'/',left(e.req_dt,    4 )) req_dt
+				, concat(mid(p.complete_dt,    5, 2 ),'/', mid(p.complete_dt,    7, 2 ), '/', left(p.complete_dt,    4 )) complete_dt
+			from event e, process p
+			where e.REQ_CODE = p.REQ_CODE
+			AND (
+		      left(e.req_dt,    8    )  between #{param.start_dt} and #{param.end_dt}    
+		      OR   left(p.complete_dt,    8    )  between #{param.start_dt} and #{param.end_dt}
+		      )
+			ORDER BY e.req_dt
+		) t,
+		  ( SELECT @RNUM := 0 ) R
+  </select>
+  <select id="ganttChart2" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+		select
+			e.req_code, 
+			substr(REPLACE(REPLACE(REPLACE(REPLACE(e.REQ_TITLE, '\r', ''), '\n', ''), '\'', '＇'), '\"', '＂'), 1, 10) TITLE
+			, case p.proc_type 
+				when 'EV01' then 'ffff00' 
+				when 'EV02' then '00ff00' 
+				when 'EV03' then 'ff0000' 
+				end
+			AS PROC_TYPE
+			, ifnull((SELECT U.NAME FROM user U WHERE U.USER_ID =  p.proc_user), '미할당') PROC_USER
+			, (select group_concat(I.use_title) from infrastructure I where concat(',',p.INFRA_ID,',') like concat('%,',I.id,',%')) AS target
+			, concat(mid(p.receipt_dt,    5, 2 ),'/', mid(p.receipt_dt,    7, 2 ),'/',left(p.receipt_dt,    4 )) receipt_dt
+			, if(isnull(p.complete_dt),(concat(mid(#{param.end_dt},    5, 2 ),'/', mid(#{param.end_dt},    7, 2 ), '/', left(#{param.end_dt},    4 ))), (concat(mid(p.complete_dt,    5, 2 ),'/', mid(p.complete_dt,    7, 2 ), '/', left(p.complete_dt,    4 )))) complete_dt
+		from event e, process p
+		where e.REQ_CODE = p.REQ_CODE
+		AND (
+	      left(p.receipt_dt,    8    )  between #{param.start_dt} and #{param.end_dt}    
+	      OR   left(p.complete_dt,    8    )  between #{param.start_dt} and #{param.end_dt}
+	      )
+		ORDER BY proc_user,receipt_dt
+  </select>
+ </mapper>

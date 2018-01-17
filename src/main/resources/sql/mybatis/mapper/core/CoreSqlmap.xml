@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="Core">
+	<sql id="nowDt">
+		DATE_FORMAT(NOW(),'%Y%m%d%H%i%s')
+	</sql>
+	<sql id="foundRows">
+		SELECT FOUND_ROWS()
+	</sql>
+	<sql id="lastInsertId">
+		SELECT LAST_INSERT_ID()
+	</sql>
+	
+	<sql id="limit">
+		<!-- @패키지.클래스명@호출할메소드(파라메터) -->
+		<choose>
+			<!-- 만약 paging 변수가 없을 경우 페이징 없는 QUERY로 정의 한다. -->
+			<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.offset) or @kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.rows)">
+			</when>
+			<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNumber(param.offset) and @kr.pe.lahuman.utils.MybatisHelperFunction@isNumber(param.rows)">
+				LIMIT ${param.offset} , ${param.rows} 
+			</when>
+			<otherwise>
+				LIMIT 0, 10 
+			</otherwise>
+		</choose>
+	</sql>
+</mapper>

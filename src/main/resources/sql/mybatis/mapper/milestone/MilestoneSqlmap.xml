@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.milestone.MilestoneDao">
+
+ <select id="comboList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+ 	SELECT
+ 		ID
+ 		, TITLE
+ 	FROM MILESTONE
+ 	WHERE STATUS='N'
+ </select>
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	ID
+     	,CONVERT(if(CURDATE() > MILESTONE_ET, '0',
+		(SELECT 5 * (DATEDIFF(MILESTONE_ET, CURDATE()) DIV 7) + MID('0123444401233334012222340111123400012345001234550', 7 *  WEEKDAY(CURDATE())+WEEKDAY(MILESTONE_ET) + 1, 1))
+		) USING utf8) AS LEFT_DAY
+		,CONVERT(
+			concat(
+			(
+					select 
+						count(*) AS denominator
+					from
+						`milestone_relation` mr
+					where 
+							mr.MILESTONE_ID = M.ID)
+							-(select 
+			    count(*) AS denominator
+			FROM
+			    event e
+			        join
+			    milestone_relation mr ON e.REQ_CODE = mr.EVENT_CODE
+			        and mr.EVENT_TYPE = 'E'
+			        left outer join
+			    process p ON e.REQ_CODE = p.REQ_CODE
+			where (p.proc_type is null
+			            OR p.proc_type = 'EV00')
+			and mr.MILESTONE_ID = m.id),  '/', (
+					select 
+						count(*) AS denominator
+					from
+						`milestone_relation` mr
+					where 
+							mr.MILESTONE_ID = M.ID)
+				) USING utf8) as percent
+    	, MILESTONE_ST
+    	, MILESTONE_ET
+    	, TITLE
+    	, STATUS
+    	, REGISTER_DT
+    	, MODIFY_DT
+	FROM MILESTONE M
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			TITLE LIKE concat('%', #{param.title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(MILESTONE_ST, 4) = #{param.year}
+		</if>
+	</where>
+	ORDER BY STATUS ASC, REGISTER_DT DESC
+	<include refid="Core.limit"/>
+  </select>
+  
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM MILESTONE M
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.title)">
+			TITLE LIKE concat('%', #{param.title}, '%')
+		</if>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.year)">
+			AND left(MILESTONE_ST, 4) = #{param.year}
+		</if>
+	</where>
+	
+  </select>
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO MILESTONE
+			(
+			   	 MILESTONE_ST
+			   	, MILESTONE_ET
+			   	, TITLE
+			   	, STATUS
+			   	, REGISTER_DT
+			   	, REGISTER_ID
+			)
+			VALUES
+			(
+			#{param.MILESTONE_st},
+			#{param.MILESTONE_et},
+			#{param.title},
+			#{param.status},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			)	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE MILESTONE
+				SET
+				`MILESTONE_ST` = #{param.MILESTONE_st},
+				`MILESTONE_ET` = #{param.MILESTONE_et},
+				`TITLE` = #{param.title},
+				`STATUS` = #{param.status},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+  	DELETE FROM MILESTONE
+	WHERE `ID` = #{param.id}
+  </delete>
+  
+  <select id="milestoneRelationList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+   select 
+    	ID
+    	, MILESTONE_ID
+    	, if(EVENT_TYPE = 'E', '업무', if(EVENT_TYPE = 'S', '단순', '외부')) AS event_type
+    	, EVENT_CODE
+    	, if(EVENT_TYPE = 'E', (select e.req_title from `event` e where e.req_code = mr.event_code), if(EVENT_TYPE = 'S', (select c.contents from `call` c where c.id = mr.event_code), (select e.work_name from `external_work` e where e.id = mr.event_code))) AS event_contents
+    	, REGISTER_DT 
+    	, MODIFY_DT
+    from MILESTONE_relation mr
+    where MILESTONE_ID  = #{param.MILESTONE_id}
+    order by ID
+  </select>
+  
+  <insert id="margeRelation" parameterType="java.util.List">
+  	 <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO MILESTONE_relation
+			(
+			   	MILESTONE_ID
+			   	, EVENT_TYPE
+		    	, EVENT_CODE
+			   	, REGISTER_DT
+			   	, REGISTER_ID
+			)
+			VALUES
+			(
+			#{param.MILESTONE_id},
+			#{param.event_type},
+			#{param.event_code},
+			<include refid="Core.nowDt"/>
+			, #{param.getLogin4UserId})	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE MILESTONE_relation
+				SET
+				`MILESTONE_ID` = #{param.MILESTONE_id},
+				`EVENT_TYPE` = #{param.event_type},
+				`EVENT_CODE` = #{param.event_code},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  
+  <delete id="deleteRelation" parameterType="kr.pe.lahuman.utils.DataMap">
+  	DELETE FROM MILESTONE_relation
+  	where 
+  		`EVENT_TYPE` = #{param.event_type} 
+  		AND	`EVENT_CODE` = #{param.event_code}
+  </delete>
+</mapper>

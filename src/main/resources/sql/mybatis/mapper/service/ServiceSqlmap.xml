@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.pe.lahuman.service.service.ServiceDao">
+
+  <select id="list" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+     SELECT 
+     	ID,
+    	NAME,
+    	USER_ID,
+    	USER,
+    	USE_YN,
+    	REGISTER_DT,
+    	MODIFY_DT
+	FROM service
+	<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.sort)">
+		ORDER BY ${param.sort}
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.order)">
+			${param.order}
+		</if>	
+	</if>
+	<include refid="Core.limit"/>
+  </select>
+  
+  <select id="listCount" parameterType="kr.pe.lahuman.utils.DataMap" resultType="java.lang.Integer">
+     SELECT count(*)
+	FROM service
+  </select>
+  
+  <select id="serviceList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    SELECT
+     	ID,
+    	NAME,
+    	USER_ID,
+    	USER,
+    	USE_YN,
+    	REGISTER_DT,
+    	MODIFY_DT
+	FROM service
+	<where>
+		<if test="@kr.pe.lahuman.utils.MybatisHelperFunction@isNotEmpty(param.USE_YN)">
+			USE_YN = #{param.USE_YN}
+		</if>
+	</where>
+    order by REGISTER_DT DESC
+  </select>
+  
+  
+  <insert id="marge" parameterType="kr.pe.lahuman.utils.DataMap">
+	  <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO service
+			(
+			`ID`,
+			`NAME`,
+			`USER_ID`,
+			`USER`,
+			`REGISTER_DT`,
+			`REGISTER_ID`,
+			`USE_YN`
+			)
+			VALUES
+			(
+			#{param.id},
+			#{param.name},
+			#{param.user_id},
+			#{param.user},
+			<include refid="Core.nowDt"/>
+			, #{param.getLogin4UserId}
+			, #{param.use_yn})	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE service
+				SET
+				`NAME` = #{param.name},
+				`USER_ID` = #{param.user_id},
+				`USER` = #{param.user},
+				`USE_YN` = #{param.use_yn},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="delete" parameterType="kr.pe.lahuman.utils.DataMap" >
+	UPDATE service SET
+  		`USE_YN` = 'N',
+  		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}
+  	where id=#{param.id}
+  </delete>
+  
+  <select id="categoryList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	ID
+    	, SERVICE_ID
+    	, NAME
+    	, REGISTER_DT 
+    	, MODIFY_DT
+    	, USE_YN
+    from category
+    where SERVICE_ID  = #{param.service_id}
+    order by REGISTER_DT DESC
+  </select>
+  
+  
+  <select id="serviceCategoryList" parameterType="kr.pe.lahuman.utils.DataMap" resultType="kr.pe.lahuman.utils.DataMap">
+    select 
+    	C.ID AS CATEGORY_ID
+    	, CONCAT(S.NAME, '-', C.NAME) AS SERVICE_CATEGORY_NM
+    	, C.NAME AS CATEGORY_NM
+    from service S, category C
+    where S.ID = C.SERVICE_ID
+    order by S.ID, C.ID
+  </select>
+  
+  <insert id="categoryMarge" parameterType="java.util.List">
+  	 <choose>
+	  	<when test="@kr.pe.lahuman.utils.MybatisHelperFunction@isEmpty(param.id)">
+	  		INSERT INTO category
+			(
+			`SERVICE_ID`,
+			`NAME`,
+			`REGISTER_DT`,
+			`REGISTER_ID`,
+			`USE_YN`
+			)
+			VALUES
+			(
+			#{param.service_id},
+			#{param.name},
+			<include refid="Core.nowDt"/>,
+			#{param.getLogin4UserId}
+			, #{param.use_yn}
+			)	
+	  	</when>
+	  	<otherwise>
+	  		UPDATE category
+				SET
+				`SERVICE_ID` = #{param.service_id},
+				`NAME` = #{param.name},
+				`USE_YN` = #{param.use_yn},
+				`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+				`MODIFY_ID` = #{param.getLogin4UserId}
+				WHERE `ID` = #{param.id}
+	  	</otherwise>
+	  </choose>
+  </insert>
+  <delete id="categoryDelete" parameterType="kr.pe.lahuman.utils.DataMap">
+  	UPDATE category SET
+  		`USE_YN` = 'N', 
+		`MODIFY_DT` = <include refid="Core.nowDt"/>, 
+		`MODIFY_ID` = #{param.getLogin4UserId}  		
+  	where id=#{param.id}
+  </delete>
+</mapper>

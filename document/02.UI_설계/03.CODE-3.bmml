@@ -1,0 +1,39 @@
+<mockup version="1.0" skin="sketch" fontFace="Balsamiq Sans" measuredW="976" measuredH="615" mockupW="800" mockupH="600">
+  <controls>
+    <control controlID="0" controlTypeID="com.balsamiq.mockups::BrowserWindow" x="176" y="15" w="800" h="600" measuredW="450" measuredH="400" zOrder="0" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>A%20Web%20Page%0Ahttp%3A//itsm.lahuman.pe.kr</text>
+      </controlProperties>
+    </control>
+    <control controlID="9" controlTypeID="com.balsamiq.mockups::DataGrid" x="239" y="217" w="-1" h="-1" measuredW="338" measuredH="141" zOrder="1" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC0C1%uC704%20%uCF54%uB4DC%uBA85%2C%20%uCF54%uB4DC%2C%20%uCF54%uB4DC%uBA85%2C%20%uB4F1%uB85D%uC77C%2C%20%uC218%uC815%uC77C%0A0000%2C%200000%2C%20%uC18C%uC18D%2C%202014-03-05%2011%3A22%2C%20%0A0000%2C%200000%2C%20%uC18C%uC18D%2C%202014-03-05%2011%3A22%2C%20%0A0000%2C%200000%2C%20%uC18C%uC18D%2C%202014-03-05%2011%3A22%2C%20%0A0000%2C%200000%2C%20%uC18C%uC18D%2C%202014-03-05%2011%3A22%2C%20</text>
+      </controlProperties>
+    </control>
+    <control controlID="11" controlTypeID="com.balsamiq.mockups::Label" x="220" y="134" w="-1" h="-1" measuredW="98" measuredH="21" zOrder="2" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uD558%uC704%20%uAD6C%uBD84%20%3A%3A%20%uBAA9%uB85D</text>
+      </controlProperties>
+    </control>
+    <control controlID="12" controlTypeID="com.balsamiq.mockups::Button" x="529" y="387" w="-1" h="-1" measuredW="48" measuredH="27" zOrder="3" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uB4F1%uB85D</text>
+      </controlProperties>
+    </control>
+    <control controlID="13" controlTypeID="com.balsamiq.mockups::Label" x="239" y="164" w="-1" h="-1" measuredW="60" measuredH="21" zOrder="4" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC0C1%uC704%uCF54%uB4DC%20%3A</text>
+      </controlProperties>
+    </control>
+    <control controlID="14" controlTypeID="com.balsamiq.mockups::ComboBox" x="306" y="164" w="-1" h="-1" measuredW="56" measuredH="46" zOrder="5" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uC18C%uC18D%0A%uAD8C%uD55C</text>
+      </controlProperties>
+    </control>
+    <control controlID="15" controlTypeID="com.balsamiq.mockups::Button" x="529" y="161" w="-1" h="-1" measuredW="48" measuredH="27" zOrder="6" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>%uAC80%uC0C9</text>
+      </controlProperties>
+    </control>
+  </controls>
+</mockup>
