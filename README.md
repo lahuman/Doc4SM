@@ -41,10 +41,6 @@ mvn clean install
 2. target/doc4sm.war 파일을 Tomcat/webapps 로 이동
 
 
-## DEMO SITE
-
-~~* [DOC4SM DEMO](http://14.55.235.194:9025) - 계정&비번 : admin ~~ 
-
 
 ## License
 
