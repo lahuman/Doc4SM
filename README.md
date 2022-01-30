@@ -43,7 +43,7 @@ mvn clean install
 
 ## DEMO SITE
 
-* [DOC4SM DEMO](http://14.55.235.194:9025) - 계정&비번 : admin 
+~~* [DOC4SM DEMO](http://14.55.235.194:9025) - 계정&비번 : admin ~~ 
 
 
 ## License
